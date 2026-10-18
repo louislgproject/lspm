@@ -7,34 +7,20 @@
   if(base.protocol!=='https:'||!base.hostname.endsWith('.supabase.co')||base.pathname!=='/')throw Error('Invalid Supabase project URL.');
   if(!/^(sb_publishable_|eyJ)/.test(config.publishableKey))throw Error('Use a public Supabase key.');
   root.CLOUD_BACKEND=true;
-  const key='pm-session:'+base.hostname;
-  let session=null,refreshing=null;
-  try{session=JSON.parse(sessionStorage.getItem(key)||'null');}catch{sessionStorage.removeItem(key);}
-  const panel=document.createElement('section');panel.className='cloud-auth';panel.setAttribute('aria-label','Account');
-  panel.innerHTML='<form id="cloudSignIn"><strong>Sign in to your workspace</strong><p>For the migrated workspace, create an account with the original owner email and verify it first.</p><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Password<input name="password" type="password" autocomplete="current-password" minlength="6" required></label><button class="button primary" type="submit">Sign in</button><button class="button" type="button" id="cloudSignUp">Create account</button></form><div id="cloudSignedIn" hidden><span id="cloudAccount"></span> <button class="button" id="cloudSignOut" type="button">Sign out</button></div><p id="cloudAuthMessage" role="status"></p>';
+  const key='pm-edit:'+base.hostname;
+  let session='';
+  try{session=sessionStorage.getItem(key)||'';}catch{session='';}
+  const panel=document.createElement('section');panel.className='cloud-auth';panel.setAttribute('aria-label','편집');
+  panel.innerHTML='<form id="cloudSignIn"><label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label><button class="button primary" type="submit">열기</button></form><div id="cloudSignedIn" hidden><button class="button" id="cloudSignOut" type="button">닫기</button></div><p id="cloudAuthMessage" role="status"></p>';
   document.querySelector('.app-header').after(panel);
   const form=panel.querySelector('form'),message=panel.querySelector('#cloudAuthMessage');
-  const render=()=>{document.body.dataset.access=session?'owner':'anonymous';form.hidden=Boolean(session);panel.querySelector('#cloudSignedIn').hidden=!session;panel.querySelector('#cloudAccount').textContent=session?.user?.email||'Signed in';};
-  const save=value=>{session=value;if(value)sessionStorage.setItem(key,JSON.stringify(value));else sessionStorage.removeItem(key);render();};
-  async function auth(path,body,token){
-    const response=await fetch(base.origin+'/auth/v1/'+path,{method:'POST',headers:{apikey:config.publishableKey,'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});
-    const result=await response.json().catch(()=>({}));
-    if(!response.ok)throw Error(result.msg||result.error_description||result.message||'Sign-in failed.');
-    return result;
-  }
-  const expiry=value=>({...value,expires_at:value.expires_at||Math.floor(Date.now()/1000)+value.expires_in});
-  async function token(){
-    if(!session)throw Error('Sign in above to open your workspace.');
-    if(session.expires_at*1000<Date.now()+60000){
-      refreshing||=auth('token?grant_type=refresh_token',{refresh_token:session.refresh_token}).then(value=>save(expiry(value))).catch(error=>{save(null);throw error;}).finally(()=>{refreshing=null;});
-      await refreshing;
-    }
-    return session.access_token;
-  }
+  const render=()=>{document.body.dataset.access=session?'owner':'anonymous';form.hidden=Boolean(session);panel.querySelector('#cloudSignedIn').hidden=!session;};
+  const save=value=>{session=value||'';if(session)sessionStorage.setItem(key,session);else sessionStorage.removeItem(key);render();};
   async function request(path,method='GET',value){
-    const response=await fetch(base.origin+'/functions/v1/ontology/api/'+path,{method,headers:{apikey:config.publishableKey,Authorization:'Bearer '+await token(),...(value!==undefined?{'Content-Type':'application/json'}:{})},...(value!==undefined?{body:JSON.stringify(value)}:{})});
+    if(!session)throw Error('비밀번호를 입력하세요.');
+    const response=await fetch(base.origin+'/functions/v1/ontology/api/'+path,{method,headers:{apikey:config.publishableKey,'x-edit-password':session,...(value!==undefined?{'Content-Type':'application/json'}:{})},...(value!==undefined?{body:JSON.stringify(value)}:{})});
     const result=await response.json();
-    if(response.status===401)save(null);
+    if(response.status===401){save('');message.textContent=result.error||'비밀번호가 다릅니다.';}
     if(!response.ok)throw Error(result.error||'Workspace request failed.');
     return result;
   }
@@ -46,19 +32,10 @@
     return {scope,filename:input.name,mimeType:({md:'text/markdown',csv:'text/csv',pdf:'application/pdf',txt:'text/plain'}[extension]||input.type||''),base64:btoa(binary)};
   }
   form.onsubmit=async event=>{
-    event.preventDefault();const button=form.querySelector('[type=submit]');button.disabled=true;message.textContent='Signing in…';
-    try{save(expiry(await auth('token?grant_type=password',{email:form.email.value,password:form.password.value})));form.password.value='';location.reload();}
-    catch(error){message.textContent=error.message;}finally{button.disabled=false;}
+    event.preventDefault();const button=form.querySelector('[type=submit]');button.disabled=true;message.textContent='';
+    save(form.password.value);form.password.value='';location.reload();
   };
-  panel.querySelector('#cloudSignUp').onclick=async()=>{
-    if(!form.reportValidity())return;
-    const button=panel.querySelector('#cloudSignUp');button.disabled=true;
-    try{const result=await auth('signup',{email:form.email.value,password:form.password.value});form.password.value='';if(result.access_token){save(expiry(result));location.reload();}else message.textContent='Check your email to confirm your account, then sign in here.';}
-    catch(error){message.textContent=error.message;}finally{button.disabled=false;}
-  };
-  panel.querySelector('#cloudSignOut').onclick=async()=>{
-    try{await auth('logout',{},await token());save(null);location.reload();}catch(error){message.textContent='Could not revoke the session: '+error.message;}
-  };
+  panel.querySelector('#cloudSignOut').onclick=()=>{save('');location.reload();};
   render();
   root.LocalAPI={
     projectAccessGet:project=>request('project-access?'+new URLSearchParams({project})),

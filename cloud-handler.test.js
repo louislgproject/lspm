@@ -81,3 +81,12 @@ test('public map assistant uses the published project and the server key',async 
  const denied=createCloudHandler({allowedOrigins:[],withPublicStore:fn=>fn(store)});
  assert.equal((await denied(new Request('https://example.supabase.co/ontology/api/public/map-assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scopeId:'library',question:'누구?',consent:true})}))).status,503);
 });
+
+test('edit password opens the published owner workspace without an account login',async()=>{
+ const {ok}=require('./edit-password');
+ assert.equal(ok('7777777'),true);assert.equal(ok('nope'),false);
+ const handler=createCloudHandler({allowedOrigins:[],authenticate:async()=>{throw Error('no account');},resolvePublishedOwner:async()=>'owner-1',withStore:async(id,fn)=>{assert.equal(id,'owner-1');return fn({load:async()=>({revision:1,projects:[]})});}});
+ const request=password=>handler(new Request('https://example.supabase.co/ontology/api/workspace',{headers:{'x-edit-password':password}}));
+ assert.equal((await request('nope')).status,401);
+ assert.equal((await request('7777777')).status,200);
+});

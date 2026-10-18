@@ -3,8 +3,8 @@ const Ingest = window.Ingestion, Logs = window.ProductionLogs;
 let basicAccess=false;
 let historyGroups={};
 const eventHistoryUI=new window.HistoryView(async()=>{const id=store?.id;workspace=await LocalAPI.load();store=id==='library'?workspace.library:workspace.projects.find(p=>p.id===id)||null;render();});
-const progressUI=new window.ProgressView(()=>{if(progressUI.active)hourlyUI.active=false;render();},async(next)=>{const id=store?.id;workspace=next||await LocalAPI.load();store=workspace.projects.find(p=>p.id===id)||null;render();});
-const hourlyUI=new window.HourlyView(()=>{if(hourlyUI.active){progressUI.active=false;progressUI.stop();}render();},async()=>{const id=store?.id;workspace=await LocalAPI.load();store=workspace.projects.find(p=>p.id===id)||null;render();});
+const progressUI=new window.ProgressView(()=>{render();},async(next)=>{const id=store?.id;workspace=next||await LocalAPI.load();store=workspace.projects.find(p=>p.id===id)||null;render();});
+const hourlyUI=new window.HourlyView(()=>{render();},async()=>{const id=store?.id;workspace=await LocalAPI.load();store=workspace.projects.find(p=>p.id===id)||null;render();});
 const samplePreparationUI=new window.SamplePreparationView(async result=>{const id=store?.id;workspace=result?.workspace||await LocalAPI.load();store=workspace.projects.find(p=>p.id===id)||null;render();});
 const $ = selector => document.querySelector(selector);
 $('#projectName').closest('label').insertAdjacentHTML('afterend','<label>Project type<select id="newProjectType">'+window.ProjectTypes.TYPES.map(t=>'<option value="'+t.id+'"'+(t.id==='sample'?' selected':'')+'>'+t.label+'</option>').join('')+'</select></label>');
@@ -407,6 +407,30 @@ function render() {
     container.before(bar);bar.hidden=false;
     if(progressUI.ctx){bar.append(progressUI.toggleButton);progressUI.view.bar.hidden=!progressUI.active;}
     if(hourlyUI.ctx){bar.append(hourlyUI.toggleButton);hourlyUI.bar.hidden=!hourlyUI.active;}
+    let split=container.parentElement.querySelector(':scope > .analysis-split');
+    if(!split){
+      split=document.createElement('div');split.className='analysis-split';split.hidden=true;
+      split.innerHTML='<div class="analysis-pane" data-pane="progress"></div><div class="analysis-split-bar" role="separator" aria-orientation="horizontal" aria-label="경계"></div><div class="analysis-pane" data-pane="hourly"></div>';
+      const handle=split.querySelector('.analysis-split-bar');
+      handle.onpointerdown=event=>{
+        if(event.button!==0)return;event.preventDefault();
+        const top=split.querySelector('[data-pane="progress"]'),startY=event.clientY,startH=top.getBoundingClientRect().height;
+        handle.setPointerCapture(event.pointerId);
+        const move=ev=>{const height=Math.max(72,Math.min(split.clientHeight-88,startH+ev.clientY-startY));top.style.flexBasis=height+'px';localStorage.setItem('pm-analysis-split',String(Math.round(height)));};
+        const end=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',end);};
+        handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',end);
+      };
+      const saved=Number(localStorage.getItem('pm-analysis-split'));
+      if(saved)split.querySelector('[data-pane="progress"]').style.flexBasis=saved+'px';
+    }
+    container.before(split);
+    if(progressUI.view?.bar)split.querySelector('[data-pane="progress"]').append(progressUI.view.bar);
+    if(hourlyUI.bar)split.querySelector('[data-pane="hourly"]').append(hourlyUI.bar,hourlyUI.table);
+    const both=progressUI.active&&hourlyUI.active;
+    split.hidden=!(progressUI.active||hourlyUI.active);
+    split.querySelector('[data-pane="progress"]').hidden=!progressUI.active;
+    split.querySelector('[data-pane="hourly"]').hidden=!hourlyUI.active;
+    split.querySelector('.analysis-split-bar').hidden=!both;
   }
   renderSavedChange();
   mapAssistantUI.update();
@@ -1878,15 +1902,4 @@ function openLinkedObject(id){
   else toast('프로세스 맵에서 이 객체의 기록된 위치를 찾지 못했습니다.');
 }
 const mapAssistantUI=new window.MapAssistantView({getScope:mapAssistantScope,ask:input=>LocalAPI.mapAssistant(input),highlight:openLinkedObject});
-function bindMapSize(stage,controls){
-  if(!stage||!controls||controls.querySelector('.map-size'))return;
-  const label=document.createElement('label');label.className='map-size';label.innerHTML='크기<input type="range" min="480" max="2000" step="20" aria-label="지도 크기">';
-  const input=label.querySelector('input');
-  const apply=value=>{const height=Math.min(2000,Math.max(480,Number(value)||720));document.querySelectorAll('.map-stage').forEach(node=>{node.style.height=height+'px';node.style.maxHeight='none';node.style.flex='none';});document.querySelectorAll('.map-size input').forEach(node=>{node.value=String(height);});localStorage.setItem('pm-map-height',String(height));};
-  input.oninput=()=>apply(input.value);
-  controls.append(label);
-  apply(localStorage.getItem('pm-map-height')||Math.round(window.innerHeight*.78));
-}
-bindMapSize($('#mapStage'),document.querySelector('.map-controls .zoom-controls'));
-bindMapSize($('#productionMapStage'),document.querySelector('#productionView .zoom-controls'));
 setInputMode(inputMode); route(); startLocal();

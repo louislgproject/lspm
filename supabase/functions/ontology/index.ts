@@ -11,6 +11,10 @@ Deno.serve(createCloudHandler({
   withPublicStore:(operation:Function,viewTokens='')=>operation(createPublicDataStore({url,apiKey,viewTokens})),
   geminiKey:Deno.env.get('GEMINI_API_KEY')||'',
   openaiKey:Deno.env.get('OPENAI_API_KEY')||'',
+  resolvePublishedOwner:async()=>{
+    const rows=await database`SELECT owner_id FROM pm.publication WHERE singleton=true`;
+    return rows[0]?.owner_id||'';
+  },
   authenticate:async (token:string)=>{
     const response=await fetch(url+'/auth/v1/user',{headers:{apikey:apiKey,Authorization:'Bearer '+token}});
     if(!response.ok)throw Error('Invalid session.');

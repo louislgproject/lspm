@@ -9,7 +9,7 @@ async function bodyBytes(request){
   return Buffer.concat(chunks);
 }
 
-function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigins,geminiKey='',geminiFetch=globalThis.fetch,openaiKey='',openaiFetch=globalThis.fetch}){
+function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigins,geminiKey='',geminiFetch=globalThis.fetch,openaiKey='',openaiFetch=globalThis.fetch,resolvePublishedOwner}){
   const origins=new Set(allowedOrigins);
   return async request=>{
     const origin=request.headers.get('origin');
@@ -76,10 +76,19 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
       }
     }
     const token=request.headers.get('authorization')?.match(/^Bearer (\S+)$/i)?.[1];
-    if(!token)return respond(401,{error:'Sign in to open your workspace.'});
+    const editPassword=request.headers.get('x-edit-password')||'';
     let user;
-    try{user=await authenticate(token);}catch{return respond(401,{error:'Your session has expired. Sign in again.'});}
-    if(!user?.id)return respond(401,{error:'Sign in to open your workspace.'});
+    try{
+      if(editPassword){
+        if(!require('./edit-password').ok(editPassword))return respond(401,{error:'비밀번호가 다릅니다.'});
+        if(resolvePublishedOwner){const id=await resolvePublishedOwner();if(!id)return respond(503,{error:'편집할 작업공간을 찾지 못했습니다.'});user={id,workspaceId:id};}
+        else user=await authenticate('master');
+      }else{
+        if(!token)return respond(401,{error:'Sign in to open your workspace.'});
+        user=await authenticate(token);
+      }
+    }catch{return respond(401,{error:'비밀번호가 다릅니다.'});}
+    if(!user?.id)return respond(401,{error:'비밀번호가 다릅니다.'});
     let bytes;
     try{bytes=await bodyBytes(request);}catch{return respond(413,{error:'Request exceeds 16 MB.'});}
     try{
