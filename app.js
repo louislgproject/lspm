@@ -393,7 +393,7 @@ function render() {
   eventHistoryUI.update(!basicAccess&&!progressUI.active&&!hourlyUI.active&&['Overview','Production'].includes(activeTab)?{workspace,store,kind:activeTab==='Production'?'production':'overview',viewKey:activeTab==='Production'?'production':selectedWorkstream?'lens-'+selectedWorkstream:'overview',selection:mapSelectedIds,workstream:selectedWorkstream,groups:historyGroups,lineId:selectedWorkstream==='production'?store.entities.find(e=>e.type==='Resource'&&e.resourceKind==='line'&&e.name===$('#mapProductionLine').value)?.id||'':''}:null);
   const progressKind=activeTab==='Production'&&productionMode==='Process map'?'production':activeTab==='Overview'&&selectedWorkstream==='production'?'overview':'';
   const features=workspace.viewSettings?.[store.id]?.features||window.HourlyProduction.defaults(store);
-  progressUI.update(progressKind&&store.id!=='library'&&(basicAccess||features.wip)?{workspace,store,basic:basicAccess,kind:progressKind,partIds:progressKind==='production'?productionPartIds:mapPartIds,zoom:progressKind==='production'?productionZoom:zoom,restore:s=>{if(progressKind==='production'){productionPartIds=[...s.ids];productionZoom=s.zoom;}else{mapPartIds=[...s.ids];zoom=s.zoom;}}}:null);
+  progressUI.update(progressKind&&store.id!=='library'&&(basicAccess||features.wip)?{workspace,store,basic:basicAccess,kind:progressKind,partIds:progressKind==='production'?productionPartIds:mapPartIds,zoom:progressKind==='production'?productionZoom:zoom,selectPart:id=>{if(progressKind==='production'){productionPartIds=[id];productionPartsCustomized=true;}else{mapPartIds=[id];mapPartsCustomized=true;}},restore:s=>{if(progressKind==='production'){productionPartIds=[...s.ids];productionZoom=s.zoom;}else{mapPartIds=[...s.ids];zoom=s.zoom;}}}:null);
   hourlyUI.update(!basicAccess&&features.hourly&&progressKind?{workspace,store,kind:progressKind,select:id=>{mapSelectedIds.clear();mapSelectedIds.add(id);decorateMapSelection();}}:null);
   document.querySelectorAll('.production-mode-toolbar').forEach(bar=>bar.hidden=true);
   if(progressKind&&(progressUI.ctx||hourlyUI.ctx)){
@@ -460,7 +460,9 @@ function renderTypeFilters() {
 }
 function renderMapPartOptions() {
   const line=selectedWorkstream==='production'?$('#mapProductionLine').value:'';
-  const parts=store.entities.filter(e=>Model.isProductPart(e)&&(!line||e.productionFamily===line)).sort(partFamilyOrder);
+  const finalOnly=selectedWorkstream==='production';
+  const parts=(finalOnly?window.FinalParts.list(store):store.entities.filter(Model.isProductPart)).filter(e=>!line||e.productionFamily===line).sort(partFamilyOrder);
+  if(finalOnly)mapPartIds=window.FinalParts.expand(store,mapPartIds);
   if(!mapPartsCustomized)mapPartIds=parts.map(part=>part.id);
   const ids=new Set(parts.map(part=>part.id));mapPartIds=mapPartIds.filter(id=>ids.has(id));
   if(!mapPartIds.includes(mapPartId))mapPartId=mapPartIds[0]||'';
@@ -469,19 +471,20 @@ function renderMapPartOptions() {
   const term=$('#mapPartSearch').value.trim().toLowerCase();
   $('#mapPartChoices').innerHTML=partChoiceRows(parts,term,mapPartIds,'map');
   $('#mapPartNav').hidden=true;
-  $('#mapPartMulti').querySelector('summary').textContent='Parts · '+mapPartIds.length+' / '+parts.length;
+  $('#mapPartMulti').querySelector('summary').textContent=(finalOnly?'Final parts':'Parts')+' · '+mapPartIds.length+' / '+parts.length;
   if(!mapPartIds.includes(mapHighlightPartId))mapHighlightPartId='';
   $('#mapHighlight').innerHTML='<option value="">All selected Parts</option>'+parts.filter(part=>mapPartIds.includes(part.id)).map(part=>'<option value="'+h(part.id)+'">'+h(part.name)+'</option>').join('');
   $('#mapHighlight').value=mapHighlightPartId;
 }
 function renderProductionPartOptions() {
   const line=$('#productionLine').value;
-  const parts=store.entities.filter(e=>Model.isProductPart(e)&&(!line||e.productionFamily===line)).sort(partFamilyOrder);
+  const parts=window.FinalParts.list(store).filter(e=>!line||e.productionFamily===line).sort(partFamilyOrder);
+  productionPartIds=window.FinalParts.expand(store,productionPartIds);
   if(!productionPartsCustomized)productionPartIds=parts.map(part=>part.id);
   const ids=new Set(parts.map(part=>part.id));productionPartIds=productionPartIds.filter(id=>ids.has(id));
   const term=$('#productionPartSearch').value.trim().toLowerCase();
   $('#productionPartChoices').innerHTML=partChoiceRows(parts,term,productionPartIds,'production');
-  $('#productionPartMulti summary').textContent='Parts · '+productionPartIds.length+' / '+parts.length;
+  $('#productionPartMulti summary').textContent='Final parts · '+productionPartIds.length+' / '+parts.length;
   if(!productionPartIds.includes(productionHighlightPartId))productionHighlightPartId='';
   $('#productionHighlight').innerHTML='<option value="">All selected Parts</option>'+parts.filter(part=>productionPartIds.includes(part.id)).map(part=>'<option value="'+h(part.id)+'">'+h(part.name)+'</option>').join('');
   $('#productionHighlight').value=productionHighlightPartId;
@@ -491,7 +494,7 @@ const partFamilyOrder=(a,b)=>partFamily(a).localeCompare(partFamily(b))||(a.prod
 function partChoiceRows(parts,term,selected,prefix){
   let last='';return parts.filter(part=>!term||part.name.toLowerCase().includes(term)||partFamily(part).toLowerCase().includes(term)||(part.productFamily||'').toLowerCase().includes(term)||(part.modelCode||'').toLowerCase().includes(term)).map(part=>{
     const family=partFamily(part)+(part.productFamily?' / '+part.productFamily:''),heading=family===last?'':'<strong class="part-family-heading">'+h(family)+'</strong>';last=family;
-    return heading+'<div class="map-part-choice"><label class="check"><input type="checkbox" data-'+prefix+'-part-choice="'+h(part.id)+'"'+(selected.includes(part.id)?' checked':'')+'>'+h(part.name+(part.modelCode?' · '+part.modelCode:''))+'</label><button type="button" data-'+prefix+'-only="'+h(part.id)+'">Only</button></div>';
+    return heading+'<div class="map-part-choice"><label class="check"><input type="checkbox" data-'+prefix+'-part-choice="'+h(part.id)+'"'+(selected.includes(part.id)?' checked':'')+'>'+h(window.FinalParts.label(part)+(part.modelCode?' · '+part.modelCode:''))+'</label><button type="button" data-'+prefix+'-only="'+h(part.id)+'">Only</button></div>';
   }).join('')||'<p class="muted">No matching Parts.</p>';
 }
 function durationLabel(seconds) {
@@ -1428,16 +1431,18 @@ $('#mapPartMulti').addEventListener('click',event=>{
   const only=event.target.closest('[data-map-only]'),action=event.target.closest('[data-map-parts-action]');if(!only&&!action)return;
   const all=store.entities.filter(item=>['Part','Part Revision'].includes(item.type)).map(item=>item.id);
   mapPartsCustomized=action?.dataset.mapPartsAction!=='all';mapPartIds=only?[only.dataset.mapOnly]:action.dataset.mapPartsAction==='all'?all:[];
+  if(only&&progressUI.active)progressUI.finalPartId=only.dataset.mapOnly;
   selectedId=null;$('#inspector').hidden=true;render();saveViewSettings(mapViewKey());if(only)$('#mapPartMulti').open=false;
 });
 $('#productionPartMulti').addEventListener('click',event=>{
   const only=event.target.closest('[data-production-only]'),action=event.target.closest('[data-production-parts-action]');if(!only&&!action)return;
   const all=store.entities.filter(item=>['Part','Part Revision'].includes(item.type)).map(item=>item.id);
   productionPartsCustomized=action?.dataset.productionPartsAction!=='all';productionPartIds=only?[only.dataset.productionOnly]:action.dataset.productionPartsAction==='all'?all:[];
+  if(only&&progressUI.active)progressUI.finalPartId=only.dataset.productionOnly;
   render();saveViewSettings('production');if(only)$('#productionPartMulti').open=false;
 });
-$('#mapPartChoices').addEventListener('change',event=>{const id=event.target.dataset.mapPartChoice;if(!id)return;mapPartsCustomized=true;if(event.target.checked){if(!mapPartIds.includes(id))mapPartIds.push(id);if(!mapPartId)mapPartId=id;}else{mapPartIds=mapPartIds.filter(item=>item!==id);if(mapPartId===id)mapPartId=mapPartIds[0]||'';}selectedId=null;$('#focusMode').value='';$('#inspector').hidden=true;render();saveViewSettings(mapViewKey());});
-$('#productionPartChoices').addEventListener('change',event=>{const id=event.target.dataset.productionPartChoice;if(!id)return;productionPartsCustomized=true;if(event.target.checked){if(!productionPartIds.includes(id))productionPartIds.push(id);}else productionPartIds=productionPartIds.filter(item=>item!==id);render();saveViewSettings('production');});
+$('#mapPartChoices').addEventListener('change',event=>{const id=event.target.dataset.mapPartChoice;if(!id)return;mapPartsCustomized=true;if(progressUI.active&&event.target.checked)progressUI.finalPartId=id;if(event.target.checked){if(!mapPartIds.includes(id))mapPartIds.push(id);if(!mapPartId)mapPartId=id;}else{mapPartIds=mapPartIds.filter(item=>item!==id);if(mapPartId===id)mapPartId=mapPartIds[0]||'';}selectedId=null;$('#focusMode').value='';$('#inspector').hidden=true;render();saveViewSettings(mapViewKey());});
+$('#productionPartChoices').addEventListener('change',event=>{const id=event.target.dataset.productionPartChoice;if(!id)return;productionPartsCustomized=true;if(progressUI.active&&event.target.checked)progressUI.finalPartId=id;if(event.target.checked){if(!productionPartIds.includes(id))productionPartIds.push(id);}else productionPartIds=productionPartIds.filter(item=>item!==id);render();saveViewSettings('production');});
 $('#showNumbers').addEventListener('change',()=>{render();saveViewSettings(mapViewKey());});
 $('#productionNumbers').addEventListener('change',()=>{render();saveViewSettings('production');});
 $('#mapHighlight').addEventListener('change',()=>{mapHighlightPartId=$('#mapHighlight').value;selectedId=null;$('#inspector').hidden=true;$('#focusMode').value='';render();focusPartInMap('overview',mapHighlightPartId);saveViewSettings('lens-production');});

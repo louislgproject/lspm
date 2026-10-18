@@ -22,9 +22,11 @@ official model code. Confirm that the selected base route is shared. Each final
 part has its own object ID, observations, hourly measurements and Unit Time.
 Neither common process steps nor identical times merge different final parts.
 
-Only the final part explicitly named by the owner, `LQ2 STD IB RH`, is added by
-the migration when its existing LS base model exists. No other combinations,
-official product codes or quantities are invented. Existing higher-level records
+The migrations register all four owner-requested LQ2 STD combinations:
+**IB RH, IB LH, OB RH, OB LH**. Existing identities are reused. Official product
+codes and quantities are not generated. Both production-map Parts menus list
+final parts; saved parent-model selections expand into their final children.
+Higher-level models remain in the ontology and existing higher-level records
 remain separately selectable as **기존 상위 모델 (상세 미분류)**. They are never
 distributed into RH/LH or IB/OB, or added to child counts. New observations and
 targets require a leaf part. Components remain supported for existing component
