@@ -76,15 +76,17 @@ function createStore(db) {
     const changes = (yield* read('SELECT project_id,data_json FROM entity_changes ORDER BY rowid')).map((row) => ({ scope: row.project_id, change: JSON.parse(row.data_json) }));
     const library = { id: 'library', name: 'Global Library', status: 'active', version: 2, entities: entities.map((e) => ({ ...e, projectId: 'library' })), relations: relations.map((r) => ({ ...r, projectId: 'library' })), changes: changes.filter((c) => !c.scope).map((c) => c.change) };
     const memberships = yield* read('SELECT project_id, entity_id FROM project_memberships');
+    const members=new Map();
+    for(const membership of memberships){let ids=members.get(membership.project_id);if(!ids)members.set(membership.project_id,ids=new Set());ids.add(membership.entity_id);}
     const assessments = new Map((yield* read('SELECT project_id,entity_id,data_json FROM project_assessments')).map((row) => [row.project_id + ':' + row.entity_id, JSON.parse(row.data_json)]));
     const schedules = new Map((yield* read('SELECT project_id,entity_id,data_json FROM project_schedules')).map((row) => [row.project_id + ':' + row.entity_id, JSON.parse(row.data_json)]));
     const lanes = yield* read('SELECT project_id,entity_id,code FROM project_workstreams');
     const projects = (yield* read('SELECT * FROM projects ORDER BY rowid')).map((row) => ({
       id: row.id, name: row.name, status: row.status, createdAt: row.created_at, updatedAt: row.updated_at, version: 2,
       projectType:row.project_type||null,
-      entities: entities.filter((e) => memberships.some((m) => m.project_id === row.id && m.entity_id === e.id)).map((e) => ({ ...e, ...assessments.get(row.id + ':' + e.id), ...schedules.get(row.id + ':' + e.id), projectId: row.id })),
-      relations: relations.filter((r) => (!r.scopeProjectId || r.scopeProjectId === row.id) && memberships.some((m) => m.project_id === row.id && m.entity_id === r.from) && memberships.some((m) => m.project_id === row.id && m.entity_id === r.to)).map((r) => ({ ...r, projectId: row.id })),
-      changes: changes.filter((c) => (!c.scope || c.scope === row.id) && memberships.some((m) => m.project_id === row.id && m.entity_id === c.change.entityId)).map((c) => c.change),
+      entities: entities.filter((e) => members.get(row.id)?.has(e.id)).map((e) => ({ ...e, ...assessments.get(row.id + ':' + e.id), ...schedules.get(row.id + ':' + e.id), projectId: row.id })),
+      relations: relations.filter((r) => (!r.scopeProjectId || r.scopeProjectId === row.id) && members.get(row.id)?.has(r.from) && members.get(row.id)?.has(r.to)).map((r) => ({ ...r, projectId: row.id })),
+      changes: changes.filter((c) => (!c.scope || c.scope === row.id) && members.get(row.id)?.has(c.change.entityId)).map((c) => c.change),
       workstreams: Object.fromEntries([...new Set(lanes.filter((item) => item.project_id === row.id).map((item) => item.entity_id))].map((id) => [id, lanes.filter((item) => item.project_id === row.id && item.entity_id === id).map((item) => item.code)]))
     }));
     const viewSettings = {};

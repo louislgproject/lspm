@@ -216,7 +216,8 @@ async function startLocal() {
   try {
     $('#projectList').innerHTML='<p class="muted" role="status">프로젝트 불러오는 중…</p>';
     if(LocalAPI.catalog){workspace=await LocalAPI.catalog();render();}
-    workspace=await LocalAPI.load();basicAccess=workspace.access?.mode==='basic';window.OwnerAccess?.init(workspace.access,{whole:openWholeProcess,production:()=>openWorkstream('production')});const health=await LocalAPI.health();aiConfigured=health.aiConfigured;mapAssistantConfigured=Boolean(health.mapAssistantConfigured);copilotConfigured=Boolean(health.copilotConfigured);copilotModel=health.copilotModel||'';startupError='';route();
+    const healthPromise=LocalAPI.health().catch(()=>({}));
+    workspace=await LocalAPI.load();basicAccess=workspace.access?.mode==='basic';window.OwnerAccess?.init(workspace.access,{whole:openWholeProcess,production:()=>openWorkstream('production')});const health=await healthPromise;aiConfigured=health.aiConfigured;mapAssistantConfigured=Boolean(health.mapAssistantConfigured);copilotConfigured=Boolean(health.copilotConfigured);copilotModel=health.copilotModel||'';startupError='';route();
   } catch (error) { startupError=window.CLOUD_BACKEND||window.PUBLIC_READ_ONLY?error.message:(/failed to fetch/i.test(error.message)?'Local server is offline. Open start-local.command and reload this page.':'Local database error: '+error.message);render(); }
 }
 function invalidatePreview() { preview = null; $('#applyCSV').disabled = true; }

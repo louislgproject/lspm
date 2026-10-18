@@ -40,15 +40,39 @@ async function run(iterator) {
   return step.value;
 }
 
-async function withPostgresStore(client,userId,operation) {
+function workspaceFromParts(parts){
+  const members=new Map();
+  for(const row of parts.memberships||[]){let ids=members.get(row.projectId);if(!ids)members.set(row.projectId,ids=new Set());ids.add(row.entityId);}
+  const assessments=new Map((parts.assessments||[]).map(row=>[row.projectId+':'+row.entityId,row.data]));
+  const schedules=new Map((parts.schedules||[]).map(row=>[row.projectId+':'+row.entityId,row.data]));
+  const entities=(parts.entities||[]).map(entity=>{if(entity.type==='Event'){entity.status||='active';if(entity.sourceId||String(entity.id).startsWith('cloud-event-'))delete entity.rawLog;}return entity;});
+  const relations=(parts.relations||[]).map(row=>({...row.data,scopeProjectId:row.scopeProjectId}));
+  const changes=parts.changes||[];
+  const lanes=parts.lanes||[];
+  const library={id:'library',name:'Global Library',status:'active',version:2,entities:entities.map(entity=>({...entity,projectId:'library'})),relations:relations.map(relation=>({...relation,projectId:'library'})),changes:changes.filter(change=>!change.scope).map(change=>change.change)};
+  const projects=(parts.projects||[]).map(row=>{
+    const member=members.get(row.id)||new Set();
+    const projectLanes=lanes.filter(item=>item.projectId===row.id);
+    return {...row,version:2,projectType:row.projectType||null,
+      entities:entities.filter(entity=>member.has(entity.id)).map(entity=>({...entity,...assessments.get(row.id+':'+entity.id),...schedules.get(row.id+':'+entity.id),projectId:row.id})),
+      relations:relations.filter(relation=>(!relation.scopeProjectId||relation.scopeProjectId===row.id)&&member.has(relation.from)&&member.has(relation.to)).map(relation=>({...relation,projectId:row.id})),
+      changes:changes.filter(change=>(!change.scope||change.scope===row.id)&&member.has(change.change?.entityId)).map(change=>change.change),
+      workstreams:Object.fromEntries([...new Set(projectLanes.map(item=>item.entityId))].map(id=>[id,projectLanes.filter(item=>item.entityId===id).map(item=>item.code)]))};
+  });
+  const viewSettings={};
+  for(const row of parts.settings||[])(viewSettings[row.projectId]||={})[row.viewKey]=row.data;
+  return {revision:Number(parts.revision),library,projects,viewSettings,pendingChange:parts.pending||null};
+}
+
+async function withPostgresStore(client,userId,operation,options={}) {
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId||''))throw Error('Authentication required.');
-  await client.query('BEGIN');
+  const readOnly=options.readOnly===true;
+  await client.query(readOnly?'BEGIN READ ONLY':'BEGIN');
   try {
     await client.query('SET LOCAL ROLE authenticated');
     await client.query("SELECT set_config('request.jwt.claim.sub',$1,true), set_config('search_path','pm,public',true)",[userId]);
-    await client.query("INSERT INTO pm.meta(key,value) VALUES ('revision','0'),('schema_version','4') ON CONFLICT(owner_id,key) DO NOTHING");
-    // Serialize writes before reading revision, so concurrent saves cannot both succeed.
-    await client.query("SELECT value FROM pm.meta WHERE key='revision' FOR UPDATE");
+    if(!readOnly)await client.query("INSERT INTO pm.meta(key,value) VALUES ('revision','0'),('schema_version','4') ON CONFLICT(owner_id,key) DO NOTHING");
+    await client.query(readOnly?"SELECT value FROM pm.meta WHERE key='revision'":"SELECT value FROM pm.meta WHERE key='revision' FOR UPDATE");
     const generators=createStore(postgresAdapter(client));
     const store=Object.fromEntries(Object.entries(generators).map(([key,method])=>[key,(...args)=>run(method(...args))]));
     const result=await operation(store,client);
@@ -60,7 +84,7 @@ async function withPostgresStore(client,userId,operation) {
   }
 }
 
-module.exports={withPostgresStore,postgresSql};
+module.exports={withPostgresStore,withPublicPostgresStore,postgresSql,workspaceFromParts};
 
 async function withPublicPostgresStore(client,operation){
   await client.query('BEGIN READ ONLY');

@@ -28,10 +28,14 @@ Deno.serve(createCloudHandler({
     });
     return {...user,workspaceId};
   },
-  withStore:async (userId:string,operation:Function)=>{
+  withStore:async (userId:string,operation:Function,options?:{readOnly?:boolean})=>{
     const connection=await database.reserve();
     const client={query:async (text:string,params:unknown[]=[])=>({rows:Array.from(await connection.unsafe(text,params as never[]))})};
-    try{return await withPostgresStore(client,userId,operation);}
+    try{return await withPostgresStore(client,userId,operation,options);}
     finally{connection.release();}
+  },
+  loadWorkspace:async ()=>{
+    const rows=await database`SELECT pm.editor_workspace_parts() AS value`;
+    return rows[0]?.value||{};
   }
 }));

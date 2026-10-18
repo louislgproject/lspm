@@ -2,6 +2,7 @@
 const {Buffer}=require('node:buffer');
 const {createRequestHandler}=require('./server');
 const {importBackup}=require('./import-backup');
+const {workspaceFromParts}=require('./postgres-store');
 const MAX_BODY=16_000_000;
 async function bodyBytes(request){
   const chunks=[];let size=0;
@@ -9,7 +10,7 @@ async function bodyBytes(request){
   return Buffer.concat(chunks);
 }
 
-function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigins,geminiKey='',geminiFetch=globalThis.fetch,openaiKey='',openaiFetch=globalThis.fetch,resolvePublishedOwner}){
+function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigins,geminiKey='',geminiFetch=globalThis.fetch,openaiKey='',openaiFetch=globalThis.fetch,resolvePublishedOwner,loadWorkspace}){
   const origins=new Set(allowedOrigins);
   return async request=>{
     const origin=request.headers.get('origin');
@@ -81,6 +82,7 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
     try{
       if(editPassword){
         if(!require('./edit-password').ok(editPassword))return respond(401,{error:'비밀번호가 다릅니다.'});
+        if(request.method==='GET'&&pathname==='/api/health')return respond(200,{ok:true,aiConfigured:Boolean(openaiKey),mapAssistantConfigured:Boolean(openaiKey),copilotConfigured:Boolean(openaiKey),copilotModel:openaiKey?'gpt-6-luna':''});
         if(resolvePublishedOwner){const id=await resolvePublishedOwner();if(!id)return respond(503,{error:'편집할 작업공간을 찾지 못했습니다.'});user={id,workspaceId:id};}
         else user=await authenticate('master');
       }else{
@@ -89,6 +91,11 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
       }
     }catch{return respond(401,{error:'비밀번호가 다릅니다.'});}
     if(!user?.id)return respond(401,{error:'비밀번호가 다릅니다.'});
+    if(request.method==='GET'&&pathname==='/api/health')return respond(200,{ok:true,aiConfigured:Boolean(openaiKey),mapAssistantConfigured:Boolean(openaiKey),copilotConfigured:Boolean(openaiKey),copilotModel:openaiKey?'gpt-6-luna':''});
+    if(request.method==='GET'&&pathname==='/api/workspace'&&loadWorkspace){
+      try{return respond(200,workspaceFromParts(await loadWorkspace()));}
+      catch{return respond(503,{error:'Workspace is unavailable.'});}
+    }
     let bytes;
     try{bytes=await bodyBytes(request);}catch{return respond(413,{error:'Request exceeds 16 MB.'});}
     try{
@@ -116,7 +123,7 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
         // its outer PostgreSQL transaction rolls back even after a partial write.
         if(status>=400){const error=Error('API request rejected.');error.response=new Response(body,{status,headers});throw error;}
         return new Response(body,{status,headers});
-      });
+      },{readOnly:request.method==='GET'});
     }catch(error){
       if(error.response)return error.response;
       if(/empty account|Unsupported backup|Missing backup|Invalid backup|Unsupported backup columns|Invalid source/.test(error.message))return respond(400,{error:error.message});
