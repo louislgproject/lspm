@@ -215,9 +215,11 @@ async function startLocal() {
   if(window.EDIT_LOCKED){startupError='';render();return;}
   try {
     $('#projectList').innerHTML='<p class="muted" role="status">프로젝트 불러오는 중…</p>';
-    if(LocalAPI.catalog){workspace=await LocalAPI.catalog();render();}
     const healthPromise=LocalAPI.health().catch(()=>({}));
-    workspace=await LocalAPI.load();basicAccess=workspace.access?.mode==='basic';window.OwnerAccess?.init(workspace.access,{whole:openWholeProcess,production:()=>openWorkstream('production')});const health=await healthPromise;aiConfigured=health.aiConfigured;mapAssistantConfigured=Boolean(health.mapAssistantConfigured);copilotConfigured=Boolean(health.copilotConfigured);copilotModel=health.copilotModel||'';startupError='';route();
+    if(LocalAPI.catalog)workspace=await LocalAPI.catalog();
+    else workspace=await LocalAPI.load();
+    render();
+    basicAccess=workspace.access?.mode==='basic';window.OwnerAccess?.init(workspace.access,{whole:openWholeProcess,production:()=>openWorkstream('production')});const health=await healthPromise;aiConfigured=health.aiConfigured;mapAssistantConfigured=Boolean(health.mapAssistantConfigured);copilotConfigured=Boolean(health.copilotConfigured);copilotModel=health.copilotModel||'';startupError='';route();
   } catch (error) { startupError=window.CLOUD_BACKEND||window.PUBLIC_READ_ONLY?error.message:(/failed to fetch/i.test(error.message)?'Local server is offline. Open start-local.command and reload this page.':'Local database error: '+error.message);render(); }
 }
 function invalidatePreview() { preview = null; $('#applyCSV').disabled = true; }
@@ -301,6 +303,20 @@ async function route() {
   if(!location.hash)history.replaceState(null,'','#/projects');
   const pendingId=location.hash.startsWith('#/projects/')?decodeURIComponent(location.hash.slice(11)):'';
   if(workspace?.catalogOnly&&location.hash==='#/library'){const loaded=await LocalAPI.load();if(serial!==routeSerial)return;workspace=loaded;}
+  if(workspace?.catalogOnly&&pendingId&&LocalAPI.loadProject&&workspace.projects.some(p=>p.id===pendingId&&p.loaded===false)){
+    $('#projectError').textContent='프로젝트 내용을 불러오는 중…';
+    try{
+      const incoming=await LocalAPI.loadProject(pendingId);if(serial!==routeSerial)return;
+      const next=incoming.projects.find(p=>p.id===pendingId),current=workspace.projects.find(p=>p.id===pendingId);
+      if(!next||!current)throw Error('Unknown project.');
+      next.loaded=true;Object.assign(current,next);
+      const seen=new Set(workspace.library.entities.map(entity=>entity.id));
+      for(const entity of incoming.library.entities)if(!seen.has(entity.id))workspace.library.entities.push(entity);
+      const seenRelations=new Set(workspace.library.relations.map(relation=>relation.id));
+      for(const relation of incoming.library.relations)if(!seenRelations.has(relation.id))workspace.library.relations.push(relation);
+      workspace.revision=incoming.revision;workspace.viewSettings={...workspace.viewSettings,...incoming.viewSettings};if(incoming.pendingChange)workspace.pendingChange=incoming.pendingChange;
+    }catch(e){$('#projectError').textContent=e.message;return;}
+  }
   if(LocalAPI.projectOpen&&workspace?.projects.some(p=>p.id===pendingId&&p.viewPending)){
     $('#projectError').textContent='프로젝트 내용을 불러오는 중…';
     try{const loaded=await LocalAPI.projectOpen(pendingId);if(serial!==routeSerial)return;workspace=loaded;basicAccess=workspace.access?.mode==='basic';window.OwnerAccess?.init(workspace.access,{whole:openWholeProcess,production:()=>openWorkstream('production')});}
@@ -340,7 +356,7 @@ function render() {
   $('#projectError').textContent=startupError;
   $('#localStartHelp').hidden=!startupError||window.CLOUD_BACKEND||window.PUBLIC_READ_ONLY;
   const projectFilter=$('#projectTypeFilter').value,listed=(workspace?.projects||[]).filter(p=>!workspace.projectAliases?.[p.id]);
-  $('#projectList').innerHTML=window.ProjectTypes.TYPES.filter(t=>!projectFilter||projectFilter===t.id).map(t=>{const group=listed.filter(p=>window.ProjectTypes.kind(p)===t.id);return group.length?'<section class="project-type-group"><h2>'+h(t.label)+' <small>'+group.length+'</small></h2><div class="project-type-cards">'+group.map(p=>'<article class="project-card"><a href="#/projects/'+encodeURIComponent(p.id)+'">'+h(p.name)+'</a><span>'+h(p.status)+(p.viewPending?' · 잠김':' · '+p.entities.length+' objects')+'</span></article>').join('')+'</div></section>':'';}).join('');
+  $('#projectList').innerHTML=window.ProjectTypes.TYPES.filter(t=>!projectFilter||projectFilter===t.id).map(t=>{const group=listed.filter(p=>window.ProjectTypes.kind(p)===t.id);return group.length?'<section class="project-type-group"><h2>'+h(t.label)+' <small>'+group.length+'</small></h2><div class="project-type-cards">'+group.map(p=>'<article class="project-card"><a href="#/projects/'+encodeURIComponent(p.id)+'">'+h(p.name)+'</a><span>'+h(p.status)+(p.viewPending?' · 잠김':' · '+(p.loaded===false?p.entityCount||0:p.entities.length)+' objects')+'</span></article>').join('')+'</div></section>':'';}).join('');
   const gate=$('#projectGate');if(gate)gate.hidden=!(window.PUBLIC_READ_ONLY&&listed.some(p=>p.viewPending));
   $('#editProjectType').hidden=!store||store.id==='library'||window.PUBLIC_READ_ONLY||basicAccess;
   if(!store){eventHistoryUI.update(null);progressUI.update(null);hourlyUI.update(null);samplePreparationUI.update(null);$('#sampleRiskTabs').hidden=true;$('#samplePreparationPanel').hidden=true;$('#projectFeatures').hidden=true;return;}
@@ -1562,7 +1578,10 @@ $('#todayButton').onclick=()=>{month=new Date();render();saveViewSettings('overv
 $('#scheduleMode').onchange=()=>{render();saveViewSettings('overview');};$('#ganttScale').onchange=()=>{render();saveViewSettings('overview');};
 $('#recordsAdd').onclick=()=>openEntity(); $('#addEntityButton').onclick=()=>openEntity(); $('#editEntity').onclick=()=>openEntity(selectedId);
 $('#addRelationButton').onclick=openRelation; $('#entityType').onchange=entityFields;
-$('#addFromLibrary').onclick=()=>{membershipSelection=new Set();$('#membershipSearch').value='';$('#includeRoute').checked=false;renderMembershipPicker();$('#membershipDialog').showModal();};
+$('#addFromLibrary').onclick=async()=>{
+  if(workspace?.catalogOnly){try{const id=store.id;workspace=await LocalAPI.load();store=workspace.projects.find(p=>p.id===id)||store;}catch(error){toast(error.message);return;}}
+  membershipSelection=new Set();$('#membershipSearch').value='';$('#includeRoute').checked=false;renderMembershipPicker();$('#membershipDialog').showModal();
+};
 $('#closeMembership').onclick=()=>$('#membershipDialog').close();
 $('#membershipSearch').oninput=renderMembershipPicker;
 $('#includeRoute').onchange=renderMembershipPicker;

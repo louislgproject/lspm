@@ -34,7 +34,9 @@ Deno.serve(createCloudHandler({
     try{return await withPostgresStore(client,userId,operation,options);}
     finally{connection.release();}
   },
-  loadWorkspace:async ()=>{
+  loadWorkspace:async (request?:{summary?:boolean,project?:string})=>{
+    if(request?.summary){const rows=await database`SELECT pm.editor_workspace_summary() AS value`;return rows[0]?.value||{};}
+    if(request?.project){const rows=await database`SELECT pm.editor_workspace_project(${request.project}) AS value`;return rows[0]?.value||null;}
     const rows=await database`SELECT pm.editor_workspace_parts() AS value`;
     return rows[0]?.value||{};
   }

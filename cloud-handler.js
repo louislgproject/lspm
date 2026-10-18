@@ -94,8 +94,13 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
     if(!user?.id)return respond(401,{error:'비밀번호가 다릅니다.'});
     if(request.method==='GET'&&pathname==='/api/health')return respond(200,{ok:true,aiConfigured:Boolean(openaiKey),mapAssistantConfigured:Boolean(openaiKey),copilotConfigured:Boolean(openaiKey),copilotModel:openaiKey?'gpt-6-luna':''});
     if(request.method==='GET'&&pathname==='/api/workspace'&&master&&loadWorkspace){
-      try{return respond(200,workspaceFromParts(await loadWorkspace()));}
-      catch{return respond(503,{error:'Workspace is unavailable.'});}
+      try{
+        const summary=url.searchParams.get('view')==='summary',project=url.searchParams.get('project')||'';
+        if(summary)return respond(200,await loadWorkspace({summary:true}));
+        const parts=await loadWorkspace(project?{project}:undefined);
+        if(project&&!parts)return respond(404,{error:'Unknown project.'});
+        return respond(200,workspaceFromParts(parts));
+      }catch{return respond(503,{error:'Workspace is unavailable.'});}
     }
     let bytes;
     try{bytes=await bodyBytes(request);}catch{return respond(413,{error:'Request exceeds 16 MB.'});}
