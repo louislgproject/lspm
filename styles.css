@@ -442,8 +442,14 @@ body.map-fullscreen-open { overflow:hidden; }
 .map-fullscreen-status { flex-basis:100%; margin:0; color:#425e70; font-size:12px; }
 .map-fullscreen .map-fullscreen-button { white-space:nowrap; }
 .map-panel:fullscreen,#productionView:fullscreen { min-height:0; overflow:hidden; }
-.map-ai-button { display:inline-flex; gap:6px; align-items:center; }
-.map-assistant-drawer { position:absolute; top:0; right:0; bottom:0; z-index:8; width:380px; max-width:100%; display:flex; flex-direction:column; background:var(--panel,#fff); border-left:1px solid var(--line); padding:16px; font-size:14px; }
+.map-copilot-button { position:absolute; right:18px; bottom:70px; z-index:6; width:58px; height:58px; border:0; border-radius:50%; background:#173a4d; color:#fff; box-shadow:0 10px 24px rgba(23,42,58,.28); display:grid; place-items:center; cursor:pointer; }
+.map-copilot-button[aria-expanded="true"] { background:#087fac; }
+.map-copilot-button:focus-visible { outline:2px solid #087fac; outline-offset:3px; }
+.map-assistant-link { padding:0 1px; border:0; background:transparent; color:#087fac; font:inherit; text-decoration:underline; text-underline-offset:2px; cursor:pointer; }
+.map-assistant-link:hover,.map-assistant-link:focus-visible { background:#e7f3fb; }
+.map-assistant-chip { border:1px solid var(--line); background:#f4f8fb; color:var(--ink); border-radius:999px; padding:4px 10px; font:600 12px/1.4 "Avenir Next","Segoe UI",sans-serif; cursor:pointer; }
+.map-assistant-chip[aria-pressed="true"] { background:#e7f3fb; border-color:#087fac; color:#085a86; box-shadow:inset 0 0 0 1px #087fac; }
+.map-assistant-drawer { position:absolute; right:18px; bottom:140px; z-index:7; width:min(380px,calc(100% - 36px)); height:min(480px,calc(100% - 170px)); display:flex; flex-direction:column; background:var(--panel,#fff); border:1px solid var(--line); border-radius:16px; box-shadow:0 16px 40px rgba(23,42,58,.18); padding:16px; font-size:14px; }
 .map-assistant-drawer[hidden] { display:none; }
 .map-assistant-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; }
 .map-assistant-heading h3 { margin:0; font-size:18px; }
@@ -458,20 +464,29 @@ body.map-fullscreen-open { overflow:hidden; }
 .map-assistant-form textarea { width:100%; font:inherit; resize:vertical; padding:12px; min-height:80px; max-height:160px; border:1px solid var(--line); border-radius:6px; }
 .map-assistant-form small { display:block; font-size:12px; line-height:1.5; color:var(--muted); margin-top:12px; }
 .map-assistant-error { color:var(--red); min-height:0; margin:8px 0; }
-.map-assistant-open>.map-stage { width:calc(100% - 380px); }
-.map-assistant-open .event-history-layout { margin-right:380px; }
 @media(max-width:760px) {
- .map-assistant-drawer { position:fixed; top:10dvh; bottom:0; width:100%; z-index:30; padding:16px; border-left:0; border-top:1px solid var(--line); }
- .map-assistant-open>.map-stage { width:100%; }
- .map-assistant-open .event-history-layout { margin-right:0; }
+ .map-copilot-button { right:12px; bottom:64px; }
+ .map-assistant-drawer { right:12px; left:12px; bottom:132px; width:auto; height:min(62dvh,calc(100% - 160px)); }
  .map-fullscreen .map-stage { flex:1; min-height:0; max-height:none; }
 }
 .selection-muted { opacity:.15!important; }
 .selection-related { opacity:1!important; }
 .selection-related>rect { stroke:#3198b8!important; stroke-width:2!important; }
+.ai-emphasis { opacity:1!important; }
+.node.ai-emphasis>rect:not(.cap),
+.flow-node.ai-emphasis .flow-card,
+.production-satellite.ai-emphasis>rect { stroke:#6d93a6!important; stroke-width:1.5px!important; }
+.ai-highlight { opacity:1!important; }
+.node.ai-highlight>rect:not(.cap),
+.flow-node.ai-highlight .flow-card,
+.production-satellite.ai-highlight>rect { fill:#e4f3fb!important; stroke:#087fac!important; stroke-width:3.5px!important; }
+.production-satellite.ai-highlight .satellite-name { fill:#173a4d; font-weight:700; }
 .node.selected,.production-satellite.selected { opacity:1!important; }
 .selection-edge { opacity:1!important; }
 .selection-edge path { stroke-width:3!important; }
+.ai-emphasis-edge { opacity:1!important; }
+.contact-link.ai-emphasis-edge { opacity:.72!important; }
+.contact-link.ai-emphasis-edge path { stroke:#7e9aab!important; stroke-width:1.4!important; }
 .network-map .contact-link,.production-map-stage .contact-link { opacity:.06; }
 .contact-link path { stroke:#9aabb5!important; stroke-width:1!important; stroke-dasharray:2 9; }
 .contact-link.selection-edge { opacity:1!important; }

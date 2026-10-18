@@ -9,7 +9,7 @@ async function bodyBytes(request){
   return Buffer.concat(chunks);
 }
 
-function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigins,geminiKey='',geminiFetch=globalThis.fetch}){
+function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigins,geminiKey='',geminiFetch=globalThis.fetch,openaiKey='',openaiFetch=globalThis.fetch}){
   const origins=new Set(allowedOrigins);
   return async request=>{
     const origin=request.headers.get('origin');
@@ -89,7 +89,7 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
         let status=200,body='';
         const res={setHeader:(key,value)=>headers.set(key,value),writeHead:(code,values)=>{status=code;for(const [key,value] of Object.entries(values||{}))headers.set(key,value);},end:value=>{body=value||'';}};
         const req={method:request.method,url:pathname+url.search,headers:Object.fromEntries(request.headers),async *[Symbol.asyncIterator](){yield bytes;}};
-        await createRequestHandler({store,geminiKey,geminiFetch})(req,res);
+        await createRequestHandler({store,geminiKey,geminiFetch,openaiKey,openaiFetch})(req,res);
         // The shared HTTP handler reports validation failures as responses. Throw so
         // its outer PostgreSQL transaction rolls back even after a partial write.
         if(status>=400){const error=Error('API request rejected.');error.response=new Response(body,{status,headers});throw error;}

@@ -151,6 +151,7 @@ const tabTypes = {
 const tabs = ['Overview',...Object.keys(tabTypes),'Input','History'];
 let workspace = null, store = null, startupError = '', selectedId = null, activeTab = 'Overview', types = new Set(presets.process);
 const mapSelectedIds=new Set();
+let pendingMapSelection='';
 const qualityExpanded=new Set();
 let mapSelectionContext='';
 let selectedWorkstream = '', historyRows = [], historyMore = false, historyOffset = 0;
@@ -205,7 +206,10 @@ async function startLocal() {
   if(location.protocol==='file:'){
     location.replace('http://127.0.0.1:4173/'+location.hash);return;
   }
-  if(!window.PUBLIC_READ_ONLY&&!window.CLOUD_BACKEND&&(location.protocol!=='http:'||!['127.0.0.1','localhost'].includes(location.hostname))){
+  const host=location.hostname.toLowerCase();
+  const localHost=location.protocol==='http:'&&(host==='127.0.0.1'||host==='localhost');
+  const previewHost=location.protocol==='https:'&&(host==='grok-sandbox.com'||host.endsWith('.grok-sandbox.com')||host==='preview.grok.genai.mil'||host==='preview.grok.mil'||host==='preview.grokgsac.com');
+  if(!window.PUBLIC_READ_ONLY&&!window.CLOUD_BACKEND&&!localHost&&!previewHost){
     startupError='This version is local only. Start it with start-local.command, then open http://127.0.0.1:4173/.';render();return;
   }
   try {
@@ -338,7 +342,7 @@ function render() {
   $('#editProjectType').hidden=!store||store.id==='library'||window.PUBLIC_READ_ONLY||basicAccess;
   if(!store){eventHistoryUI.update(null);progressUI.update(null);hourlyUI.update(null);samplePreparationUI.update(null);$('#sampleRiskTabs').hidden=true;$('#samplePreparationPanel').hidden=true;$('#projectFeatures').hidden=true;return;}
   const selectionContext=[store.id,selectedWorkstream,activeTab,$('#mapProductionLine').value,$('#productionLine').value].join('|');
-  if(selectionContext!==mapSelectionContext){mapSelectedIds.clear();mapSelectionContext=selectionContext;}
+  if(selectionContext!==mapSelectionContext){mapSelectedIds.clear();mapSelectionContext=selectionContext;if(pendingMapSelection&&Model.byId(store,pendingMapSelection))mapSelectedIds.add(pendingMapSelection);}
   for(const id of mapSelectedIds)if(!Model.byId(store,id))mapSelectedIds.delete(id);
   const library=store.id==='library',archived=store.status==='archived';
   $('#entryCopilot').hidden=library;
@@ -730,8 +734,9 @@ function decorateMapSelection() {
   for(const layerId of ['nodeLayer','productionNodes'])for(const node of $('#'+layerId).querySelectorAll('[data-select]')){
     node.querySelectorAll('.map-detail-button').forEach(button=>button.remove());
     const id=node.dataset.select,selected=mapSelectedIds.has(id);
-    node.classList.toggle('selected',selected);node.setAttribute('aria-pressed',String(selected));
+    node.classList.toggle('selected',selected);node.classList.remove('ai-highlight','ai-emphasis');node.setAttribute('aria-pressed',String(selected));
     if(active){node.classList.remove('route-muted','dimmed');node.classList.toggle('selection-muted',!related.has(id));node.classList.toggle('selection-related',related.has(id)&&!selected);}
+    else node.classList.remove('selection-muted','selection-related');
     if(selected&&!basicAccess){
       const button=document.createElementNS('http://www.w3.org/2000/svg','g');
       button.setAttribute('class','map-detail-button');button.setAttribute('data-open-detail',id);button.setAttribute('role','button');button.setAttribute('tabindex','0');button.setAttribute('aria-label','Open details: '+Model.byId(store,id).name);
@@ -741,7 +746,7 @@ function decorateMapSelection() {
   }
   if(active)for(const layerId of ['edgeLayer','productionEdges'])for(const edge of $('#'+layerId).querySelectorAll('[data-from][data-to]')){
     const incident=mapSelectedIds.has(edge.dataset.from)||mapSelectedIds.has(edge.dataset.to);
-    edge.classList.remove('route-muted','dimmed');edge.classList.toggle('selection-muted',!incident);edge.classList.toggle('selection-edge',incident);
+    edge.classList.remove('route-muted','dimmed','ai-emphasis-edge');edge.classList.toggle('selection-muted',!incident);edge.classList.toggle('selection-edge',incident);
   }
 }
 function selectEntity(id, jump=true) {
@@ -1459,7 +1464,7 @@ $('#perspective').addEventListener('change',()=>{types=new Set(presets[$('#persp
 $('#allTypes').onclick=()=>{types=new Set(allTypes);renderTypeFilters();render();saveViewSettings(mapViewKey());};
 $('#noTypes').onclick=()=>{types.clear();renderTypeFilters();render();saveViewSettings(mapViewKey());};
 $('#resetFilters').onclick=()=>{resetFilters();if(selectedWorkstream){types=new Set(allTypes);renderTypeFilters();}render();saveViewSettings(mapViewKey());};
-$('#clearSelection').onclick=()=>{mapSelectedIds.clear();selectedId=null;$('#focusMode').value='';$('#inspector').hidden=true;render();};
+$('#clearSelection').onclick=()=>{pendingMapSelection='';mapSelectedIds.clear();selectedId=null;$('#focusMode').value='';$('#inspector').hidden=true;render();};
 $('#productionClearSelection').onclick=$('#clearSelection').onclick;
 $('#closeInspector').onclick=()=>{$('#inspector').hidden=true;};
 $('#zoomIn').onclick=()=>{zoom=Math.min(2,zoom*1.2);applyZoom();saveViewSettings(mapViewKey());};
@@ -1790,29 +1795,87 @@ $('#archiveProject').onclick=async ()=>{
 window.addEventListener('hashchange',route);
 function mapAssistantScope(){
   if(basicAccess||!store||!['Overview','Production'].includes(activeTab)||activeTab==='Production'&&productionMode!=='Process map')return null;
-  const production=activeTab==='Production',layer=production?'productionNodes':'nodeLayer';
-  const line=production?$('#productionLine').value:selectedWorkstream==='production'?$('#mapProductionLine').value:'';
-  const visibleIds=store.id==='library'||!selectedWorkstream&&!production?null:[...new Set([...$('#'+layer).querySelectorAll('[data-select]')].map(e=>e.dataset.select))];
-  return {scopeId:store.id,visibleIds,configured:mapAssistantConfigured,key:store.id+'/'+activeTab+'/'+selectedWorkstream+'/'+line+'/'+(visibleIds||[]).slice().sort().join(','),title:store.name+(line?' · '+line:'')+(selectedWorkstream?' · '+selectedWorkstream:production?' · Production':' · 전체 온톨로지')};
+  return {scopeId:store.id,visibleIds:null,configured:mapAssistantConfigured,key:store.id,title:(store.id==='library'?'전체 온톨로지':store.name+' · 프로젝트 온톨로지 전체')};
 }
-function focusMapSelection(kind){
+function focusMapSelection(kind,idSet){
   const production=kind==='production',stage=$(production?'#productionMapStage':'#mapStage'),layer=$(production?'#productionNodes':'#nodeLayer');
-  const nodes=[...layer.querySelectorAll('[data-select]')],selected=nodes.filter(n=>mapSelectedIds.has(n.dataset.select)),targets=selected.length?selected:nodes.slice(0,1);if(!targets.length)return;
+  const wanted=idSet||mapSelectedIds,nodes=[...layer.querySelectorAll('[data-select]')],selected=nodes.filter(n=>wanted.has(n.dataset.select)),targets=selected.length?selected:nodes.slice(0,1);if(!targets.length)return;
   const boxes=targets.map(n=>{const b=n.getBBox(),m=n.transform.baseVal.consolidate()?.matrix;return {x:b.x+(m?.e||0),y:b.y+(m?.f||0),width:b.width,height:b.height};});
   const left=Math.min(...boxes.map(b=>b.x)),top=Math.min(...boxes.map(b=>b.y)),right=Math.max(...boxes.map(b=>b.x+b.width)),bottom=Math.max(...boxes.map(b=>b.y+b.height));
   const scale=Math.max(.8,Math.min(1.3,(stage.clientWidth-64)/Math.max(1,right-left),(stage.clientHeight-64)/Math.max(1,bottom-top)));
   if(production){productionZoom=scale;applyProductionZoom();}else{zoom=scale;applyZoom();}
   stage.scrollTo({left:Math.max(0,(left+right)/2*scale-stage.clientWidth/2),top:Math.max(0,(top+bottom)/2*scale-stage.clientHeight/2),behavior:matchMedia('(prefers-reduced-motion: reduce)').matches?'instant':'smooth'});
 }
-function highlightAssistantObjects(ids){
-  const valid=ids.filter(id=>Model.byId(store,id));if(!valid.length)return;
-  if(store.id==='library'){const settings=workspace.viewSettings?.library?.universalGroups;if(settings)settings.collapsed=(settings.collapsed||[]).filter(group=>!(historyGroups[group]||[]).some(id=>valid.includes(id)));}
-  mapSelectedIds.clear();valid.forEach(id=>mapSelectedIds.add(id));selectedId=null;$('#inspector').hidden=true;render();
-  const layer=activeTab==='Production'?$('#productionNodes'):$('#nodeLayer'),shown=new Set([...layer.querySelectorAll('[data-select]')].map(n=>n.dataset.select));
-  const hidden=valid.filter(id=>!shown.has(id));
-  for(const id of hidden)for(const r of store.relations){const next=r.from===id?r.to:r.to===id?r.from:null;if(shown.has(next))mapSelectedIds.add(next);}
-  decorateMapSelection();if(hidden.length)toast(hidden.length+'개 객체는 현재 필터에서 숨겨져 있습니다. 표시된 관련 객체를 강조합니다.');
-  requestAnimationFrame(()=>focusMapSelection(activeTab==='Production'?'production':'overview'));
+function routeTarget(entity){
+  const lines=new Set(),parts=new Set(),addPart=id=>{const part=Model.byId(store,id);if(part&&Model.isProductPart(part))parts.add(part.id);};
+  const named=value=>['SMT','LDM','Nexlide','TEM'].includes(value)?value:'';
+  const lineOf=item=>{if(!item)return '';const family=named(item.productionFamily);if(family)return family;if(item.type==='Resource'&&item.resourceKind==='line')return ['SMT','LDM','Nexlide','TEM'].find(line=>(item.name||'').includes(line))||'';return '';};
+  const people=['Person','Organization'].includes(entity.type),machines=entity.type==='Resource'&&['machine','test_equipment'].includes(entity.resourceKind),components=Model.isComponentPart(entity);
+  if(Model.isProductPart(entity))addPart(entity.id);
+  const steps=new Set(entity.type==='Production Step'?[entity.id]:[]);
+  for(const relation of store.relations){
+    if(relation.to===entity.id&&['requires','applies_to','consumes','produces'].includes(relation.type)&&Model.byId(store,relation.from)?.type==='Production Step')steps.add(relation.from);
+    if(components&&relation.type==='part_of'&&relation.from===entity.id)addPart(relation.to);
+  }
+  for(const step of steps)for(const relation of store.relations)if(relation.from===step&&['applies_to','consumes','produces'].includes(relation.type))addPart(relation.to);
+  const line=lineOf(entity);
+  if(line)lines.add(line);
+  for(const id of parts){const family=lineOf(Model.byId(store,id));if(family)lines.add(family);}
+  if(people){
+    const orgs=new Set(entity.type==='Organization'?[entity.id]:store.relations.filter(relation=>relation.type==='member_of'&&relation.from===entity.id).map(relation=>relation.to));
+    for(const relation of store.relations){
+      if(['works_on','manages'].includes(relation.type)&&relation.from===entity.id){const found=lineOf(Model.byId(store,relation.to));if(found)lines.add(found);}
+      if(relation.type==='supports_line'&&orgs.has(relation.from)){const found=lineOf(Model.byId(store,relation.to));if(found)lines.add(found);}
+      if(relation.type==='escalates_to'&&orgs.has(relation.to)){const found=lineOf(Model.byId(store,relation.from));if(found)lines.add(found);}
+    }
+  }
+  return {line:[...lines][0]||'',partIds:[...parts],people,machines,components:components||entity.type==='Part'};
 }
-const mapAssistantUI=new window.MapAssistantView({getScope:mapAssistantScope,ask:input=>LocalAPI.mapAssistant(input),highlight:highlightAssistantObjects});
+function partsOnLine(line){return store.entities.filter(entity=>Model.isProductPart(entity)&&(!line||entity.productionFamily===line)).map(entity=>entity.id);}
+function applyProductionTarget(target){
+  const line=['','SMT','LDM','Nexlide','TEM'].includes(target.line)?target.line:'';
+  if($('#productionLine').value!==line){productionSelections[$('#productionLine').value||'all']={partIds:[...productionPartIds],partSelectionCustomized:productionPartsCustomized,highlightPartId:productionHighlightPartId};$('#productionLine').value=line;$('#productionLine').dataset.previous=line;}
+  const allowed=new Set(partsOnLine(line)),wanted=target.partIds.filter(id=>allowed.has(id));
+  if(wanted.length&&!target.people){productionPartsCustomized=true;productionPartIds=wanted;}
+  else {productionPartsCustomized=false;productionPartIds=[...allowed];}
+  if(target.people)$('#productionSeeStakeholders').checked=true;
+  if(target.machines)$('#productionSeeMachines').checked=true;
+  if(target.components)$('#productionSeeComponents').checked=true;
+  productionHighlightPartId='';
+}
+function applyOverviewTarget(target){
+  const line=['','SMT','LDM','Nexlide','TEM'].includes(target.line)?target.line:'';
+  $('#mapProductionLine').value=line;
+  const allowed=new Set(partsOnLine(line)),wanted=target.partIds.filter(id=>allowed.has(id));
+  if(wanted.length&&!target.people){mapPartsCustomized=true;mapPartIds=wanted;}
+  else {mapPartsCustomized=false;mapPartIds=[...allowed];}
+  if(target.people)$('#mapSeeStakeholders').checked=true;
+  if(target.machines)$('#mapSeeMachines').checked=true;
+  if(target.components)$('#mapSeeComponents').checked=true;
+  mapHighlightPartId='';
+  if($('#searchInput').value)$('#searchInput').value='';
+  if($('#statusFilter').value)$('#statusFilter').value='';
+}
+function mapNode(id){const layer=activeTab==='Production'?$('#productionNodes'):$('#nodeLayer');return [...layer.querySelectorAll('[data-select]')].find(node=>node.dataset.select===id)||null;}
+function releaseCollapsed(id){
+  const settings=workspace.viewSettings?.[store.id]?.universalGroups;if(!settings?.collapsed?.length)return false;
+  const next=settings.collapsed.filter(group=>!(historyGroups[group]||[]).includes(id));if(next.length===settings.collapsed.length)return false;settings.collapsed=next;return true;
+}
+function openLinkedObject(id){
+  const entity=Model.byId(store,id);if(!entity){toast('온톨로지에 없는 이름입니다.');return;}
+  const target=routeTarget(entity),onProduction=activeTab==='Production'&&productionMode==='Process map';
+  const moved=onProduction||store.id!=='library'&&(target.partIds.length||target.line||target.people||target.machines);
+  const arm=()=>{pendingMapSelection=id;mapSelectedIds.clear();mapSelectedIds.add(id);selectedId=null;$('#inspector').hidden=true;};
+  if(!types.has(entity.type)){types.add(entity.type);renderTypeFilters();}
+  if(onProduction)applyProductionTarget(target);
+  else if(moved){if(selectedWorkstream!=='production'){selectedWorkstream='production';activeTab='Overview';}$('#perspective').value='process';applyOverviewTarget(target);}
+  arm();render();
+  if(!mapNode(id)&&releaseCollapsed(id)){arm();render();}
+  if(!mapNode(id)&&target.people){if(onProduction)$('#productionSeeStakeholders').checked=true;else $('#mapSeeStakeholders').checked=true;arm();render();}
+  pendingMapSelection='';
+  if(mapNode(id))requestAnimationFrame(()=>focusMapSelection(activeTab==='Production'?'production':'overview',new Set([id])));
+  else if(moved)toast('그 공정이 보이게 옮겼습니다. 맵에서 바로 집히는 노드는 없습니다.');
+  else toast('프로세스 맵에서 이 객체의 기록된 위치를 찾지 못했습니다.');
+}
+const mapAssistantUI=new window.MapAssistantView({getScope:mapAssistantScope,ask:input=>LocalAPI.mapAssistant(input),highlight:openLinkedObject});
 setInputMode(inputMode); route(); startLocal();

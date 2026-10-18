@@ -4,6 +4,7 @@ function redact(message,token){
   let value=String(message);
   if(token)value=value.replaceAll(token,'[redacted]');
   return value.replace(/\b(?:sbp_|sb_secret_)[A-Za-z0-9_-]+/g,'[redacted]')
+    .replace(/\bsk-(?:proj-)?[A-Za-z0-9_-]{20,}/g,'[redacted]')
     .replace(/\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+/g,'[redacted]')
     .replace(/(postgres(?:ql)?:\/\/)[^\s"']+/gi,'$1[redacted]')
     .slice(0,2000);

@@ -10,6 +10,7 @@ Deno.serve(createCloudHandler({
   allowedOrigins,
   withPublicStore:(operation:Function,viewTokens='')=>operation(createPublicDataStore({url,apiKey,viewTokens})),
   geminiKey:Deno.env.get('GEMINI_API_KEY')||'',
+  openaiKey:Deno.env.get('OPENAI_API_KEY')||'',
   authenticate:async (token:string)=>{
     const response=await fetch(url+'/auth/v1/user',{headers:{apikey:apiKey,Authorization:'Bearer '+token}});
     if(!response.ok)throw Error('Invalid session.');

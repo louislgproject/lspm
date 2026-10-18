@@ -1,6 +1,10 @@
 (function(root) {
+  function previewPrefix() {
+    const match = String(location.pathname || '').match(/^\/hds-[a-z0-9]+-\d+-[a-z0-9]+/i);
+    return match ? match[0] : '';
+  }
   async function request(path, options) {
-    const response = await fetch(path, options);
+    const response = await fetch(previewPrefix() + path, options);
     const value = await response.json();
     if(response.status===401&&document.body.dataset.access==='owner')window.dispatchEvent(new Event('pm-access-expired'));
     if (!response.ok) throw Error(value.error || 'Local server request failed.');

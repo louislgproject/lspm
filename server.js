@@ -25,7 +25,7 @@ const EXTRACTION_SCHEMA = {
     unresolved: { type: 'array', items: { type: 'object', properties: { text: { type: 'string' }, reason: { type: 'string' } }, required: ['text', 'reason'] } }
   }, required: ['summary', 'objects', 'relationships', 'unresolved']
 };
-function createRequestHandler({ store, geminiKey = '', geminiFetch = globalThis.fetch, checkOrigin = () => true, serveAsset = null }) {
+function createRequestHandler({ store, geminiKey = '', openaiKey = '', geminiFetch = globalThis.fetch, openaiFetch = globalThis.fetch, checkOrigin = () => true, serveAsset = null, preview = false }) {
   const json = (res, status, value) => {res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' });res.end(JSON.stringify(value));};
   const readJson = async (req) => {
     if (!String(req.headers['content-type'] || '').startsWith('application/json')) throw Error('Use application/json.');
@@ -39,17 +39,19 @@ function createRequestHandler({ store, geminiKey = '', geminiFetch = globalThis.
   return async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'no-referrer');
-    res.setHeader('Cross-Origin-Resource-Policy', 'same-origin');
-    res.setHeader('Content-Security-Policy', "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'");
+    res.setHeader('Cross-Origin-Resource-Policy', preview ? 'cross-origin' : 'same-origin');
+    res.setHeader('Content-Security-Policy', preview
+      ? "default-src 'self'; script-src 'self' https://grok.com; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data: https://grok.com; base-uri 'none'; form-action 'self'"
+      : "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; base-uri 'none'; form-action 'self'");
     if (!checkOrigin(req)) {json(res, 403, { error: 'Foreign origin blocked.' });return;}
     const url = new URL(req.url, 'http://127.0.0.1'),pathname = url.pathname;
     try {
-      if (req.method === 'GET' && pathname === '/api/health') {json(res, 200, { ok: true, aiConfigured: Boolean(geminiKey), mapAssistantConfigured:Boolean(geminiKey) });return;}
+      if (req.method === 'GET' && pathname === '/api/health') {json(res, 200, { ok: true, aiConfigured: Boolean(geminiKey), mapAssistantConfigured:Boolean(openaiKey), copilotConfigured:Boolean(openaiKey), copilotModel:openaiKey?'gpt-6-luna':'' });return;}
       if(req.method==='POST'&&pathname==='/api/map-assistant'){
-        const input=await readJson(req);if(input.consent!==true)throw Error('Approve sending this map context to Gemini.');
+        const input=await readJson(req);if(input.consent!==true)throw Error('Approve sending this map context to OpenAI.');
         const workspace=await store.load(),scope=input.scopeId==='library'?workspace.library:workspace.projects.find(p=>p.id===input.scopeId);
         if(!scope)throw Error('Unknown map scope.');
-        json(res,200,await require('./map-assistant-server').answer({scope,input,key:geminiKey,fetchImpl:geminiFetch}));return;
+        json(res,200,await require('./map-assistant-server').answer({scope,input,key:openaiKey,fetchImpl:openaiFetch}));return;
       }
       if (req.method === 'GET' && pathname === '/api/workspace') {json(res, 200, await store.load());return;}
       const productionReads={'/api/progress':'listProgress','/api/hourly':'listHourly','/api/sample-preparation':'samplePreparationList'};
@@ -158,11 +160,12 @@ function createRequestHandler({ store, geminiKey = '', geminiFetch = globalThis.
         json(res, 200, await store.saveIngestion({ filename, mimeType, content, draft, scope: scope.id }));return;
       }
       const asset = pathname === '/' ? 'index.html' : pathname.slice(1);
-      if (req.method === 'GET' && !asset.includes('/') && ASSETS.has(asset)) {
+      if ((req.method === 'GET' || req.method === 'HEAD') && !asset.includes('/') && ASSETS.has(asset)) {
         if (serveAsset) return serveAsset(asset, res);
         const file = path.join(__dirname, asset);
         if (!fs.existsSync(file)) {json(res, 404, { error: 'Not found.' });return;}
         res.writeHead(200, { 'Content-Type': MIME[path.extname(file)] || 'application/octet-stream' });
+        if (req.method === 'HEAD') {res.end();return;}
         fs.createReadStream(file).pipe(res);return;
       }
       json(res, 404, { error: 'Not found.' });
@@ -172,22 +175,45 @@ function createRequestHandler({ store, geminiKey = '', geminiFetch = globalThis.
   };
 }
 
-function createServer({ dbPath = path.join(__dirname, '..', '.local-data', 'ontology.sqlite'), port = 4173, geminiKey = process.env.GEMINI_API_KEY || '', geminiFetch = globalThis.fetch } = {}) {
+function createServer({ dbPath = path.join(__dirname, '..', '.local-data', 'ontology.sqlite'), port = 4173, host = '127.0.0.1', preview = false, geminiKey = process.env.GEMINI_API_KEY || '', openaiKey = process.env.OPENAI_API_KEY || '', geminiFetch = globalThis.fetch, openaiFetch = globalThis.fetch } = {}) {
   const { openStore } = require('./local-store.js');
   const store = openStore(dbPath);
-  const server = http.createServer(createRequestHandler({ store, geminiKey, geminiFetch, checkOrigin: (req) => {
+  const previewHost = (value) => {
+    const host = String(value || '').toLowerCase();
+    return host === '127.0.0.1' || host === 'localhost' || host === 'grok-sandbox.com' || host.endsWith('.grok-sandbox.com') || host === 'preview.grok.genai.mil' || host === 'preview.grok.mil' || host === 'preview.grokgsac.com';
+  };
+  const server = http.createServer(createRequestHandler({ store, geminiKey, openaiKey, geminiFetch, openaiFetch, preview, checkOrigin: (req) => {
       const currentPort = server.address()?.port;
       const allowed = ['127.0.0.1:' + currentPort, 'localhost:' + currentPort];
-      return allowed.includes(String(req.headers.host || '')) && (!req.headers.origin || allowed.map((host) => 'http://' + host).includes(req.headers.origin));
+      const origin = req.headers.origin || '';
+      const local = allowed.includes(String(req.headers.host || '')) && (!origin || allowed.map((item) => 'http://' + item).includes(origin));
+      if (local) return true;
+      if (!preview) return false;
+      if (!origin) return true;
+      try { return previewHost(new URL(origin).hostname); } catch { return false; }
     } }));
   return {
-    listen: () => new Promise((resolve, reject) => {server.once('error', reject);server.listen(port, '127.0.0.1', () => {server.off('error', reject);resolve('http://127.0.0.1:' + server.address().port);});}),
+    listen: () => new Promise((resolve, reject) => {server.once('error', reject);server.listen(port, host, () => {server.off('error', reject);resolve('http://127.0.0.1:' + server.address().port);});}),
     close: () => new Promise((resolve, reject) => server.close((error) => {store.close();error ? reject(error) : resolve();}))
   };
 }
 
+function loadOpenAiEnv() {
+  let text = '';
+  try { text = fs.readFileSync(path.join(__dirname, '.env'), 'utf8'); } catch { return; }
+  for (const line of text.split(/\n/)) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#') || !trimmed.startsWith('OPENAI_API_KEY=')) continue;
+    let value = trimmed.slice('OPENAI_API_KEY='.length).trim();
+    if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) value = value.slice(1, -1);
+    if (value && !process.env.OPENAI_API_KEY) process.env.OPENAI_API_KEY = value;
+  }
+}
+
 if (require.main === module) {
-  createServer({ port: Number(process.env.PORT) || 4173, dbPath: process.env.PM_DB_PATH || undefined }).listen().
+  loadOpenAiEnv();
+  const preview = process.env.PM_PREVIEW === '1';
+  createServer({ port: Number(process.env.PORT) || 4173, dbPath: process.env.PM_DB_PATH || undefined, host: preview ? '0.0.0.0' : '127.0.0.1', preview }).listen().
   then((url) => process.stdout.write('PM Process Twin local: ' + url + '\n')).
   catch((error) => {process.stderr.write(error.message + '\n');process.exitCode = 1;});
 }
