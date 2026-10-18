@@ -439,7 +439,7 @@ function placeMapResize(stage){
     handle.className='map-resize-bar';handle.tabIndex=0;
     handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','horizontal');
     handle.setAttribute('aria-label','프로세스 맵 높이');handle.setAttribute('aria-valuemin',String(minimum));handle.setAttribute('aria-valuemax',String(maximum));
-    handle.title='아래로 늘리기 · 위로 줄이기 · 방향키로 조절 · 두 번 클릭하면 기본 크기';
+    handle.title='위로 늘리기 · 아래로 줄이기 · 방향키로 조절 · 두 번 클릭하면 기본 크기';
     handle.innerHTML='<span class="map-resize-value" aria-hidden="true"></span>';
     handle.addEventListener('pointerdown',event=>{
       if(event.button!==0||event.isPrimary===false||state.drag)return;
@@ -449,7 +449,7 @@ function placeMapResize(stage){
       handle.setPointerCapture(event.pointerId);
       const move=ev=>{
         if(ev.pointerId!==state.drag?.id)return;
-        ev.preventDefault();apply(state.drag.height+ev.clientY-state.drag.y);
+        ev.preventDefault();apply(state.drag.height+state.drag.y-ev.clientY);
       };
       const end=ev=>{
         if(!state.drag||ev.pointerId!=null&&ev.pointerId!==state.drag.id)return;
@@ -465,7 +465,7 @@ function placeMapResize(stage){
     });
     handle.addEventListener('keydown',event=>{
       const step=event.shiftKey?80:24;
-      const height=event.key==='ArrowDown'?state.height+step:event.key==='ArrowUp'?state.height-step:event.key==='Home'?minimum:event.key==='End'?maximum:null;
+      const height=event.key==='ArrowUp'?state.height+step:event.key==='ArrowDown'?state.height-step:event.key==='Home'?minimum:event.key==='End'?maximum:null;
       if(height==null)return;event.preventDefault();event.stopPropagation();apply(height);save();
     });
     handle.addEventListener('dblclick',()=>{apply(defaultHeight());save();});
