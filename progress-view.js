@@ -47,7 +47,7 @@
     }
     toggle(){
       if(!this.ctx)return;this.stop();
-      if(!this.active){this.saved={ids:[...this.ctx.partIds],zoom:this.ctx.zoom,left:this.view.stage.scrollLeft,top:this.view.stage.scrollTop};this.active=true;}
+      if(!this.active){this.saved={ids:[...this.ctx.partIds],zoom:this.ctx.zoom,left:this.view.stage.scrollLeft,top:this.view.stage.scrollTop};const chosen=F.expand(this.ctx.store,this.ctx.partIds);if(chosen.length===1)this.finalPartId=chosen[0];this.active=true;}
       else{this.active=false;this.ctx.restore(this.saved);}
       this.renderApp();if(!this.active)requestAnimationFrame(()=>{this.view.stage.scrollLeft=this.saved.left;this.view.stage.scrollTop=this.saved.top;});
     }
