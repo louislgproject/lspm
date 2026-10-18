@@ -710,6 +710,14 @@ body.production-progress-active label:has(#mapSeeStakeholders) {display:none!imp
 @media(max-width:600px){.hourly-toolbar {padding:12px;}.hourly-toolbar [data-hourly-controls] {width:100%;}.hourly-toolbar label {flex:1;min-width:130px;}.hourly-toolbar select,.hourly-toolbar input {width:100%;}.hourly-table {padding:12px;}}
 body[data-access="project"] :is(.project-access-settings,#editEntity,#removeFromProject,#addEntityButton,#addRelationButton,#recordsAdd,#productionConnect,#openHistory,[data-progress-add],[data-history-add]) {display:none!important;}
 body:not([data-access="owner"]) .project-access-settings {display:none!important;}
+.part-model-group {border-bottom:1px solid var(--line);padding:7px 0;}
+.part-model-group>summary {display:flex;align-items:center;justify-content:space-between;gap:8px;cursor:pointer;}
+.part-model-group>summary label {font-weight:600;flex-wrap:wrap;}
+.part-model-group>summary button {border:1px solid var(--line);background:var(--paper);color:var(--ink);padding:5px 10px;cursor:pointer;}
+.part-model-group>summary::before {content:'▸';color:var(--muted);}
+.part-model-group[open]>summary::before {content:'▾';}
+.part-model-group small {color:var(--muted);font-size:11px;font-weight:400;}
+.part-model-children {margin:6px 0 5px 14px;padding-left:12px;border-left:2px solid var(--line);}
 .hourly-view-active .map-footer {display:none;}
 .hourly-table [hidden] {display:none!important;}
 .hourly-capacity {color:var(--muted);font-size:13px;margin:8px 0;}

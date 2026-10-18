@@ -135,6 +135,8 @@
   TEXT_FIELDS.push('modelCode','codeNamespace','sourcePartName','mappingState');
   TEXT_FIELDS.push('displayProcessName');
   TEXT_FIELDS.push('inOut');
+  TEXT_FIELDS.push('productOption');
+  TEXT_FIELDS.push('routeStatus');
   TEXT_FIELDS.push('qualityKind','qualityCode','qualityColor','qualityDisposition','qualityGroup','qualityFamily','qualityPlan','qualityCC','qualityDocument');
   const LONG_TEXT_FIELDS = ["assessmentNote", "operatorAction", "acceptanceCriteria", "failureAction"];
   const PRODUCTION_EVENT_KINDS = ['arrived','started','completed','failed','held','released'];
@@ -194,6 +196,8 @@
     if (entity.itemKind && !["product", "component"].includes(entity.itemKind)) throw Error("Invalid Part item kind.");
     if (entity.side && !["LH", "RH"].includes(entity.side)) throw Error("Invalid Part side.");
     if (entity.inOut && (!['IB','OB'].includes(entity.inOut)||!['Part','Part Revision'].includes(entity.type))) throw Error('Invalid Part IB/OB.');
+    if (entity.productOption && (!['STD','OPT'].includes(entity.productOption)||!['Part','Part Revision'].includes(entity.type))) throw Error('Invalid Part STD/OPT.');
+    if (entity.routeStatus && (!['registered','unregistered'].includes(entity.routeStatus)||!['Part','Part Revision'].includes(entity.type))) throw Error('Invalid Part route status.');
     if (entity.verticalPosition && !["Upper", "Lower"].includes(entity.verticalPosition)) throw Error("Invalid Part vertical position.");
     if (entity.machineMode && !["shared_pool","specific_asset"].includes(entity.machineMode)) throw Error("Invalid machine mode.");
     if ((entity.machineMode || entity.machineFamily) && entity.type !== "Resource") throw Error("Machine details belong to a Resource.");

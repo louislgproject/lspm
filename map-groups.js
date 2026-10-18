@@ -133,7 +133,20 @@ function networkGroups(project,network,{collapsed=[],showMachines=true,showCompo
 function partRows(project,network,{showMachines=true,showComponents=true,collapsed=[]}={}){
  const F=workflow(),nodes=[],edges=[],positions={},satellites=[],frames=[],groups=new Map(),occurrences=new Map(),used=new Set();let y=32,width=480;
  const lanes=F.productionLanes(project,{partIds:network.parts.map(p=>p.id)}).lanes;
+ const routeGroups=new Map(),partsModel=typeof module==='object'?require('./final-parts'):root.FinalParts;
  for(const part of network.parts){
+  const lane=lanes.find(l=>l.id===part.id),laneItems=new Map((lane?.items||[]).map(n=>[n.id,n]));
+  const route=network.nodes.filter(n=>n.entity.type==='Production Step'&&n.partIds?.includes(part.id)),ids=new Set(route.map(n=>n.id));
+  if(!route.length)continue;
+  const links=network.edges.filter(e=>ids.has(e.from)&&ids.has(e.to)&&(!e.partIds?.length||e.partIds.includes(part.id)));
+  // Compare the complete recorded route, machines and materials even when a
+  // display toggle hides satellites. Different part-scoped inputs never merge.
+  const allContext=F.productionContextLayout(project,{nodes:route,edges:links,parts:[part],partOnly:true},{showMachines:true,showComponents:true});
+  const key=JSON.stringify([part.productionFamily||'',route.map(n=>[n.id,laneItems.get(n.id)?.lane||'']).sort(),links.map(e=>[e.from,e.type,e.to]).sort(),allContext.satellites.map(s=>[s.stepId,s.direction,s.kind,s.entity.id,s.relation?.quantity??null,s.relation?.unit||'']).sort(),project.relations.filter(r=>r.type==='operated_in'&&ids.has(r.from)).map(r=>[r.from,r.to]).sort()]);
+  if(!routeGroups.has(key))routeGroups.set(key,[]);routeGroups.get(key).push(part);
+ }
+ for(const members of routeGroups.values()){
+  const part=members[0],partIds=members.map(p=>p.id);
   const lane=lanes.find(l=>l.id===part.id),laneItems=new Map((lane?.items||[]).map(n=>[n.id,n]));
   const original=network.nodes.filter(n=>n.entity.type==='Production Step'&&n.partIds?.includes(part.id)).map(n=>({...n,unconfirmed:laneItems.has(n.id)?laneItems.get(n.id).lane==='unconfirmed':n.unconfirmed}));if(!original.length)continue;
   const ids=new Set(original.map(n=>n.id)),rowEdges=network.edges.filter(e=>ids.has(e.from)&&ids.has(e.to)&&(!e.partIds?.length||e.partIds.includes(part.id)));
@@ -145,12 +158,13 @@ function partRows(project,network,{showMachines=true,showComponents=true,collaps
   let bottom=mainY+88+maxOutput*59;
   let sideY=bottom;
   for(let i=0;i<side.length;i+=4){const batch=side.slice(i,i+4);batch.forEach((n,j)=>rowPositions.set(n.id,{x:32+j*256,y:sideY}));sideY+=Math.max(...batch.map(n=>88+context.satellites.filter(s=>s.stepId===n.id).length*59),106);}
-  for(const n of original){const id='part-view:'+part.id+':'+n.id,p=rowPositions.get(n.id);positions[id]=p;nodes.push({...n,id,partIds:[part.id]});used.add(n.id);if(!occurrences.has(n.id))occurrences.set(n.id,[]);occurrences.get(n.id).push(id);}
-  for(const e of rowEdges)edges.push({...e,from:'part-view:'+part.id+':'+e.from,to:'part-view:'+part.id+':'+e.to,partIds:[part.id]});
-  for(const n of original){const items=context.satellites.filter(s=>s.stepId===n.id),p=rowPositions.get(n.id);for(const direction of ['input','output'])items.filter(s=>s.direction===direction).forEach((s,i)=>satellites.push({...s,stepId:'part-view:'+part.id+':'+n.id,partIds:[part.id],x:p.x,y:mainIds.has(n.id)?direction==='input'?y+64+i*59:mainY+88+i*59:p.y+80+items.indexOf(s)*59}));}
+  for(const n of original){const id='part-view:'+part.id+':'+n.id,p=rowPositions.get(n.id);positions[id]=p;nodes.push({...n,id,partIds});used.add(n.id);if(!occurrences.has(n.id))occurrences.set(n.id,[]);occurrences.get(n.id).push(id);}
+  for(const e of rowEdges)edges.push({...e,from:'part-view:'+part.id+':'+e.from,to:'part-view:'+part.id+':'+e.to,partIds});
+  for(const n of original){const items=context.satellites.filter(s=>s.stepId===n.id),p=rowPositions.get(n.id);for(const direction of ['input','output'])items.filter(s=>s.direction===direction).forEach((s,i)=>satellites.push({...s,stepId:'part-view:'+part.id+':'+n.id,partIds,x:p.x,y:mainIds.has(n.id)?direction==='input'?y+64+i*59:mainY+88+i*59:p.y+80+items.indexOf(s)*59}));}
   const rowSatellites=satellites.filter(s=>s.partIds.includes(part.id)),rowWidth=Math.max(320,...original.map(n=>rowPositions.get(n.id).x+226));
   const rowBottom=Math.max(sideY,...rowSatellites.map(s=>s.y+76));
-  frames.push({name:part.name,kind:'Part',x:16,y,width:rowWidth+16,height:rowBottom-y,static:true});width=Math.max(width,rowWidth+48);y=rowBottom+48;
+  const modelNames=[...new Set(members.map(p=>partsModel.model(project,p).name))];
+  frames.push({name:members.length>1?modelNames.join(' / ')+' · '+members.length+' 세부 파츠':part.name,kind:'Model',partIds,x:16,y,width:rowWidth+16,height:rowBottom-y,static:true});width=Math.max(width,rowWidth+48);y=rowBottom+48;
  }
  const materialIds=new Set(satellites.map(s=>s.entity.id));
  for(const s of satellites)if(!positions[s.entity.id])positions[s.entity.id]={x:s.x,y:s.y};

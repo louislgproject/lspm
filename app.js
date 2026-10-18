@@ -498,9 +498,9 @@ function renderMapPartOptions() {
   $('#mapPart').innerHTML='<option value="">All parts</option>'+parts.map(e=>'<option value="'+h(e.id)+'">'+h(e.name)+'</option>').join('');
   $('#mapPart').value=mapPartId;
   const term=$('#mapPartSearch').value.trim().toLowerCase();
-  $('#mapPartChoices').innerHTML=partChoiceRows(parts,term,mapPartIds,'map');
+  $('#mapPartChoices').innerHTML=partChoiceRows(parts,term,mapPartIds,'map');$('#mapPartChoices').querySelectorAll('[data-partial]').forEach(input=>input.indeterminate=true);
   $('#mapPartNav').hidden=true;
-  $('#mapPartMulti').querySelector('summary').textContent=(finalOnly?'Final parts':'Parts')+' · '+mapPartIds.length+' / '+parts.length;
+  $('#mapPartMulti').querySelector('summary').textContent=(finalOnly&&!progressUI.active?'Models · '+window.FinalParts.models(store,parts).filter(g=>g.parts.some(p=>mapPartIds.includes(p.id))).length+' / '+window.FinalParts.models(store,parts).length:(finalOnly?'Final parts':'Parts')+' · '+mapPartIds.length+' / '+parts.length);
   if(!mapPartIds.includes(mapHighlightPartId))mapHighlightPartId='';
   $('#mapHighlight').innerHTML='<option value="">All selected Parts</option>'+parts.filter(part=>mapPartIds.includes(part.id)).map(part=>'<option value="'+h(part.id)+'">'+h(part.name)+'</option>').join('');
   $('#mapHighlight').value=mapHighlightPartId;
@@ -512,8 +512,8 @@ function renderProductionPartOptions() {
   if(!productionPartsCustomized)productionPartIds=parts.map(part=>part.id);
   const ids=new Set(parts.map(part=>part.id));productionPartIds=productionPartIds.filter(id=>ids.has(id));
   const term=$('#productionPartSearch').value.trim().toLowerCase();
-  $('#productionPartChoices').innerHTML=partChoiceRows(parts,term,productionPartIds,'production');
-  $('#productionPartMulti summary').textContent='Final parts · '+productionPartIds.length+' / '+parts.length;
+  $('#productionPartChoices').innerHTML=partChoiceRows(parts,term,productionPartIds,'production');$('#productionPartChoices').querySelectorAll('[data-partial]').forEach(input=>input.indeterminate=true);
+  $('#productionPartMulti summary').textContent=(!progressUI.active?'Models · '+window.FinalParts.models(store,parts).filter(g=>g.parts.some(p=>productionPartIds.includes(p.id))).length+' / '+window.FinalParts.models(store,parts).length:'Final parts · '+productionPartIds.length+' / '+parts.length);
   if(!productionPartIds.includes(productionHighlightPartId))productionHighlightPartId='';
   $('#productionHighlight').innerHTML='<option value="">All selected Parts</option>'+parts.filter(part=>productionPartIds.includes(part.id)).map(part=>'<option value="'+h(part.id)+'">'+h(part.name)+'</option>').join('');
   $('#productionHighlight').value=productionHighlightPartId;
@@ -521,9 +521,14 @@ function renderProductionPartOptions() {
 const partFamily=part=>part.productionFamily?.trim()||'Unclassified';
 const partFamilyOrder=(a,b)=>partFamily(a).localeCompare(partFamily(b))||(a.productFamily||'').localeCompare(b.productFamily||'')||a.name.localeCompare(b.name);
 function partChoiceRows(parts,term,selected,prefix){
-  let last='';return parts.filter(part=>!term||part.name.toLowerCase().includes(term)||partFamily(part).toLowerCase().includes(term)||(part.productFamily||'').toLowerCase().includes(term)||(part.modelCode||'').toLowerCase().includes(term)).map(part=>{
-    const family=partFamily(part)+(part.productFamily?' / '+part.productFamily:''),heading=family===last?'':'<strong class="part-family-heading">'+h(family)+'</strong>';last=family;
-    return heading+'<div class="map-part-choice"><label class="check"><input type="checkbox" data-'+prefix+'-part-choice="'+h(part.id)+'"'+(selected.includes(part.id)?' checked':'')+'>'+h(window.FinalParts.label(part)+(part.modelCode?' · '+part.modelCode:''))+'</label><button type="button" data-'+prefix+'-only="'+h(part.id)+'">Only</button></div>';
+  const production=prefix==='production'||selectedWorkstream==='production',chosen=new Set(selected);
+  const leaf=part=>'<div class="map-part-choice"><label class="check"><input type="checkbox" data-'+prefix+'-part-choice="'+h(part.id)+'"'+(chosen.has(part.id)?' checked':'')+'>'+h(window.FinalParts.label(part)+(part.modelCode?' · '+part.modelCode:''))+(part.routeStatus==='unregistered'?'<small>공정 미등록</small>':'')+'</label><button type="button" data-'+prefix+'-only="'+h(part.id)+'">Only</button></div>';
+  const matches=part=>!term||window.FinalParts.label(part).toLowerCase().includes(term)||partFamily(part).toLowerCase().includes(term)||(part.productFamily||'').toLowerCase().includes(term)||(part.modelCode||'').toLowerCase().includes(term);
+  let last='';const heading=part=>{const family=partFamily(part)+(part.productFamily?' / '+part.productFamily:''),text=family===last?'':'<strong class="part-family-heading">'+h(family)+'</strong>';last=family;return text;};
+  if(!production)return parts.filter(matches).map(part=>heading(part)+leaf(part)).join('')||'<p class="muted">No matching Parts.</p>';
+  return window.FinalParts.models(store,parts).filter(group=>group.parts.some(matches)).map(group=>{
+    const shown=group.parts.filter(matches),ids=group.parts.map(p=>p.id),count=ids.filter(id=>chosen.has(id)).length;
+    return heading(group.parts[0])+'<details class="part-model-group"'+(progressUI.active||term?' open':'')+'><summary><label class="check"><input type="checkbox" data-'+prefix+'-model-choice="'+h(ids.join(','))+'"'+(count===ids.length?' checked':'')+(count&&count<ids.length?' data-partial="true"':'')+'>'+h(group.name)+' <small>'+group.parts.length+' 세부 파츠</small></label><button type="button" data-'+prefix+'-model-only="'+h(ids.join(','))+'">Only</button></summary><div class="part-model-children">'+shown.map(leaf).join('')+'</div></details>';
   }).join('')||'<p class="muted">No matching Parts.</p>';
 }
 function durationLabel(seconds) {
@@ -554,7 +559,7 @@ function networkMetric(node,mode,highlightPartId='') {
   return {text:(row?row.count:'—')+' workers',title:row?'Direct '+row.basis+' at '+row.capturedAt+' · '+(direct?'Step':'one linked machine')+' · shift '+(row.shift||'not recorded'):'No direct Step observation'+(machines.length===1?' or linked-machine observation':'')};
 }
 function mapGroupFrames(layout) {
-  return (layout.frames||[]).map(f=>'<g class="universal-group" transform="translate('+f.x+' '+f.y+')"><rect class="universal-group-boundary" width="'+f.width+'" height="'+f.height+'" rx="16"></rect>'+(f.collapsed?'':f.static?'<text x="20" y="32">'+h(f.kind+' · '+f.name)+'</text>':'<g data-group-toggle="'+h(f.id)+'" tabindex="0" role="button" aria-expanded="true" aria-label="Collapse '+h(f.name)+'"><rect class="universal-group-heading" x="8" y="8" width="'+(f.width-16)+'" height="36" rx="8"></rect><text x="20" y="32">'+h(f.kind+' · '+f.name)+' −</text></g>')+'</g>').join('');
+  return (layout.frames||[]).map(f=>'<g class="universal-group" data-model-parts="'+h((f.partIds||[]).join(','))+'" transform="translate('+f.x+' '+f.y+')"><rect class="universal-group-boundary" width="'+f.width+'" height="'+f.height+'" rx="16"></rect>'+(f.collapsed?'':f.static?'<text x="20" y="32">'+h(f.kind+' · '+f.name)+'</text>':'<g data-group-toggle="'+h(f.id)+'" tabindex="0" role="button" aria-expanded="true" aria-label="Collapse '+h(f.name)+'"><rect class="universal-group-heading" x="8" y="8" width="'+(f.width-16)+'" height="36" rx="8"></rect><text x="20" y="32">'+h(f.kind+' · '+f.name)+' −</text></g>')+'</g>').join('');
 }
 function mapGroupSettings(network,whole=false) {
   const saved=workspace.viewSettings?.[store.id]?.universalGroups;
@@ -724,7 +729,7 @@ function renderMap(invalid) {
     const sub=!graph.summary&&[r.from,r.to].some(id=>{const entity=graph.entities.find(e=>e.id===id);return entity&&Flow.isSubprocess(entity);});
     return '<g data-from="'+h(r.from)+'" data-to="'+h(r.to)+'" class="'+(sub&&!highlight?'sub-edge ':related&&!highlight?'dimmed':'')+'"><path class="edge '+(r.type==='precedes'?'':'context-edge ')+(highlight?'highlighted':'')+'" d="'+path+'"></path><text class="edge-label" x="'+((a.x+b.x+220)/2)+'" y="'+(same?a.y+32:(startY+endY)/2-5)+'" text-anchor="middle">'+h(r.type)+'</text></g>';
   }).join('');
-  $('#nodeLayer').innerHTML=(layout.frames||[]).map(f=>'<g class="universal-group" transform="translate('+f.x+' '+f.y+')"><rect class="universal-group-boundary" width="'+f.width+'" height="'+f.height+'" rx="16"></rect><g data-group-toggle="'+h(f.id)+'" tabindex="0" role="button" aria-expanded="true" aria-label="Collapse '+h(f.name)+'"><rect class="universal-group-heading" x="8" y="8" width="'+(f.width-16)+'" height="36" rx="8"></rect><text x="20" y="32">'+h(f.kind+' · '+f.name)+' −</text></g></g>').join('')+graph.entities.map(e=>{
+  $('#nodeLayer').innerHTML=(layout.frames||[]).map(f=>'<g class="universal-group" data-model-parts="'+h((f.partIds||[]).join(','))+'" transform="translate('+f.x+' '+f.y+')"><rect class="universal-group-boundary" width="'+f.width+'" height="'+f.height+'" rx="16"></rect><g data-group-toggle="'+h(f.id)+'" tabindex="0" role="button" aria-expanded="true" aria-label="Collapse '+h(f.name)+'"><rect class="universal-group-heading" x="8" y="8" width="'+(f.width-16)+'" height="36" rx="8"></rect><text x="20" y="32">'+h(f.kind+' · '+f.name)+' −</text></g></g>').join('')+graph.entities.map(e=>{
     const p=pos[e.id], r=Flow.range(e), context=graph.context.has(e.id);
     if(e.groupId)return '<g class="node summary-node" data-group-toggle="'+h(e.groupId)+'" tabindex="0" role="button" aria-label="Expand '+h(e.name)+'" transform="translate('+p.x+' '+p.y+')"><rect width="220" height="94"></rect><text class="node-name" x="14" y="39">'+h(short(e.name))+'</text><text class="node-meta" x="14" y="65">'+e.summaryCount+' objects · Expand</text></g>';
     if(graph.summary){
@@ -1458,6 +1463,7 @@ $('#mapPart').addEventListener('change',()=>{mapPartId=$('#mapPart').value;if(ma
 $('#mapPartSearch').addEventListener('input',renderMapPartOptions);
 $('#productionPartSearch').addEventListener('input',renderProductionPartOptions);
 $('#mapPartMulti').addEventListener('click',event=>{
+  const model=event.target.closest('[data-map-model-only]');if(model){mapPartsCustomized=true;mapPartIds=model.dataset.mapModelOnly.split(',');if(progressUI.active&&!mapPartIds.includes(progressUI.finalPartId))progressUI.finalPartId=mapPartIds[0];render();saveViewSettings(mapViewKey());$('#mapPartMulti').open=false;return;}
   const only=event.target.closest('[data-map-only]'),action=event.target.closest('[data-map-parts-action]');if(!only&&!action)return;
   const all=store.entities.filter(item=>['Part','Part Revision'].includes(item.type)).map(item=>item.id);
   mapPartsCustomized=action?.dataset.mapPartsAction!=='all';mapPartIds=only?[only.dataset.mapOnly]:action.dataset.mapPartsAction==='all'?all:[];
@@ -1465,14 +1471,15 @@ $('#mapPartMulti').addEventListener('click',event=>{
   selectedId=null;$('#inspector').hidden=true;render();saveViewSettings(mapViewKey());if(only)$('#mapPartMulti').open=false;
 });
 $('#productionPartMulti').addEventListener('click',event=>{
+  const model=event.target.closest('[data-production-model-only]');if(model){productionPartsCustomized=true;productionPartIds=model.dataset.productionModelOnly.split(',');if(progressUI.active&&!productionPartIds.includes(progressUI.finalPartId))progressUI.finalPartId=productionPartIds[0];render();saveViewSettings('production');$('#productionPartMulti').open=false;return;}
   const only=event.target.closest('[data-production-only]'),action=event.target.closest('[data-production-parts-action]');if(!only&&!action)return;
   const all=store.entities.filter(item=>['Part','Part Revision'].includes(item.type)).map(item=>item.id);
   productionPartsCustomized=action?.dataset.productionPartsAction!=='all';productionPartIds=only?[only.dataset.productionOnly]:action.dataset.productionPartsAction==='all'?all:[];
   if(only&&progressUI.active)progressUI.finalPartId=only.dataset.productionOnly;
   render();saveViewSettings('production');if(only)$('#productionPartMulti').open=false;
 });
-$('#mapPartChoices').addEventListener('change',event=>{const id=event.target.dataset.mapPartChoice;if(!id)return;mapPartsCustomized=true;if(progressUI.active&&event.target.checked)progressUI.finalPartId=id;if(event.target.checked){if(!mapPartIds.includes(id))mapPartIds.push(id);if(!mapPartId)mapPartId=id;}else{mapPartIds=mapPartIds.filter(item=>item!==id);if(mapPartId===id)mapPartId=mapPartIds[0]||'';}selectedId=null;$('#focusMode').value='';$('#inspector').hidden=true;render();saveViewSettings(mapViewKey());});
-$('#productionPartChoices').addEventListener('change',event=>{const id=event.target.dataset.productionPartChoice;if(!id)return;productionPartsCustomized=true;if(progressUI.active&&event.target.checked)progressUI.finalPartId=id;if(event.target.checked){if(!productionPartIds.includes(id))productionPartIds.push(id);}else productionPartIds=productionPartIds.filter(item=>item!==id);render();saveViewSettings('production');});
+$('#mapPartChoices').addEventListener('change',event=>{if(event.target.dataset.mapModelChoice){const ids=event.target.dataset.mapModelChoice.split(',');mapPartsCustomized=true;mapPartIds=event.target.checked?[...new Set([...mapPartIds,...ids])]:mapPartIds.filter(id=>!ids.includes(id));render();saveViewSettings(mapViewKey());return;}const id=event.target.dataset.mapPartChoice;if(!id)return;mapPartsCustomized=true;if(progressUI.active&&event.target.checked)progressUI.finalPartId=id;if(event.target.checked){if(!mapPartIds.includes(id))mapPartIds.push(id);if(!mapPartId)mapPartId=id;}else{mapPartIds=mapPartIds.filter(item=>item!==id);if(mapPartId===id)mapPartId=mapPartIds[0]||'';}selectedId=null;$('#focusMode').value='';$('#inspector').hidden=true;render();saveViewSettings(mapViewKey());});
+$('#productionPartChoices').addEventListener('change',event=>{if(event.target.dataset.productionModelChoice){const ids=event.target.dataset.productionModelChoice.split(',');productionPartsCustomized=true;productionPartIds=event.target.checked?[...new Set([...productionPartIds,...ids])]:productionPartIds.filter(id=>!ids.includes(id));render();saveViewSettings('production');return;}const id=event.target.dataset.productionPartChoice;if(!id)return;productionPartsCustomized=true;if(progressUI.active&&event.target.checked)progressUI.finalPartId=id;if(event.target.checked){if(!productionPartIds.includes(id))productionPartIds.push(id);}else productionPartIds=productionPartIds.filter(item=>item!==id);render();saveViewSettings('production');});
 $('#showNumbers').addEventListener('change',()=>{render();saveViewSettings(mapViewKey());});
 $('#productionNumbers').addEventListener('change',()=>{render();saveViewSettings('production');});
 $('#mapHighlight').addEventListener('change',()=>{mapHighlightPartId=$('#mapHighlight').value;selectedId=null;$('#inspector').hidden=true;$('#focusMode').value='';render();focusPartInMap('overview',mapHighlightPartId);saveViewSettings('lens-production');});
