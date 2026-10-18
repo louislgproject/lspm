@@ -375,7 +375,7 @@ function render() {
   $('#archiveProject').textContent=archived?'Restore':'Archive';
   ['renameProject','addFromLibrary','removeFromProject','recordsAdd','productionConnect','addEntityButton','addRelationButton','editEntity','previewCSV','extractSource'].forEach(id=>$('#'+id).disabled=archived);
   $('#extractSource').disabled=archived||!aiConfigured;
-  $('#externalTransfer').textContent=aiConfigured?'Pressing Extract sends only this source to the configured Gemini API. Your full ontology stays on this computer. Review the draft before any ontology update.':'AI not configured. Set GEMINI_API_KEY on the local server; manual and CSV input remain available.';
+  $('#externalTransfer').textContent=aiConfigured?'추출은 이 원문만 OpenAI로 보냅니다. 온톨로지 전체는 보내지 않습니다.':'AI가 연결되지 않았습니다. 서버에 OPENAI_API_KEY가 있어야 합니다. 수동 입력과 CSV는 그대로 됩니다.';
   if(archived) invalidatePreview();
   const visibleTabs=productionScope?['Overview','Parts','Risk / Issues','Resources','Stakeholders','Records']:['Overview','Timeline',...tabs.filter(tab=>tab!=='Overview')];
   if(!library)visibleTabs.push('Copilot');
@@ -886,7 +886,7 @@ function renderStakeholders(invalid) {
 }
 function renderCopilot(){
   const state=copilotChats.get(store.id)||{messages:[],error:'',busy:false};
-  $('#copilotStatus').textContent=copilotConfigured?store.name+' · '+copilotModel:window.PUBLIC_READ_ONLY?'Copilot은 현재 로컬 앱에서 사용 가능합니다. 공개 사이트 AI 연결에는 별도 서버가 필요합니다.':'Not connected: set OPENAI_API_KEY in .env and restart the local server.';
+  $('#copilotStatus').textContent=copilotConfigured?store.name+' · '+copilotModel:'Copilot이 연결되지 않았습니다.';
   $('#copilotSend').disabled=!copilotConfigured||state.busy;
   $('#copilotSend').textContent=state.busy?'답변 중…':'보내기';
   $('#copilotClear').disabled=state.busy;

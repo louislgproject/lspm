@@ -158,7 +158,7 @@ test('HTTP change review can keep or revert latest committed project update', as
 });
 
 test('AI extraction stays disabled without a server-side key', async t => {
-  const baseUrl = await fixture(t,{geminiKey:''});
+  const baseUrl = await fixture(t,{openaiKey:''});
   assert.equal((await (await fetch(baseUrl+'/api/health')).json()).aiConfigured,false);
   const response=await fetch(baseUrl+'/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scope:'library',text:'Supplier called.'})});
   assert.equal(response.status,503);
@@ -167,16 +167,17 @@ test('AI extraction stays disabled without a server-side key', async t => {
 
 test('AI source stays local until explicit extraction, then returns reviewed draft', async t => {
   const candidate={summary:'Buyer A met Supplier B.',objects:[{candidateId:'c1',suggestedAction:'create',type:'Person',name:'Buyer A',confidence:.9,sourceExcerpt:'Buyer A'}],relationships:[],unresolved:[]};
-  const geminiFetch=async (url,request)=>{
-    assert.match(url,/generativelanguage\.googleapis\.com/);
-    assert.equal(request.headers['x-goog-api-key'],'test-key');
-    const config=JSON.parse(request.body).generationConfig;
-    assert.equal(config.responseFormat.text.mimeType,'application/json');
-    assert.equal(config.responseFormat.text.schema.type,'object');
-    assert.equal(Object.hasOwn(config,'temperature'),false);
-    return new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(candidate)}]}}]}),{status:200,headers:{'Content-Type':'application/json'}});
+  const openaiFetch=async (url,request)=>{
+    assert.equal(url,'https://api.openai.com/v1/chat/completions');
+    assert.equal(request.headers.Authorization,'Bearer test-key');
+    const body=JSON.parse(request.body);
+    assert.equal(body.model,'gpt-6-luna');
+    assert.equal(body.response_format.type,'json_object');
+    assert.equal(Object.hasOwn(body,'temperature'),false);
+    assert.match(body.messages.at(-1).content,/Buyer A met Supplier B/);
+    return new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(candidate)}}]}),{status:200,headers:{'Content-Type':'application/json'}});
   };
-  const baseUrl=await fixture(t,{geminiKey:'test-key',geminiFetch});
+  const baseUrl=await fixture(t,{openaiKey:'test-key',openaiFetch});
   const before=await (await fetch(baseUrl+'/api/export')).json();
   assert.equal(before.sources.length,0);
   const response=await fetch(baseUrl+'/api/extract',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scope:'library',text:'Buyer A met Supplier B.'})});
@@ -195,8 +196,8 @@ test('AI cannot choose a Library ID; ambiguous names are offered for human revie
     {candidateId:'person-b',suggestedAction:'link_existing',matchedObjectId:'invented-id',type:'Person',name:'Buyer B'},
     {candidateId:'person-c',suggestedAction:'link_existing',matchedObjectId:'invented-id',type:'Person',name:'Buyer C'}
   ],relationships:[],unresolved:[]};
-  const geminiFetch=async()=>new Response(JSON.stringify({candidates:[{content:{parts:[{text:JSON.stringify(output)}]}}]}),{status:200});
-  const baseUrl=await fixture(t,{geminiKey:'test-key',geminiFetch});
+  const openaiFetch=async()=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(output)}}]}),{status:200});
+  const baseUrl=await fixture(t,{openaiKey:'test-key',openaiFetch});
   let ws=await (await fetch(baseUrl+'/api/workspace')).json();
   const a=Model.addEntity(ws.library,{type:'Person',name:'Buyer A'});
   const b1=Model.addEntity(ws.library,{type:'Person',name:'Buyer B'});

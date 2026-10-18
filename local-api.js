@@ -30,8 +30,6 @@
     progressSave:input=>request('/api/progress',{method:'POST',...json(input)}),
     historyQuery:input=>request('/api/history/query',{method:'POST',...json(input)}),
     historyDetail:(id,scope)=>request('/api/history/events/'+encodeURIComponent(id)+'?'+new URLSearchParams({scope})),
-    historySource:async(scope,input,metadata={})=>request('/api/history/sources',{method:'POST',...json({...await sourcePayload(scope,input),metadata})}),
-    historyAction:(action,input)=>request('/api/history/'+action,{method:'POST',...json(input)}),
     historyJobs:scope=>request('/api/history/jobs?'+new URLSearchParams({scope})),
     load:() => request('/api/workspace'),
     save:(workspace,scope,revision,ingestionCommit=null) => request('/api/workspace',{method:'POST',...json({workspace,scope,revision,ingestionCommit})}),

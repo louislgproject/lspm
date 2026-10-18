@@ -41,7 +41,7 @@ The workflow `.github/workflows/supabase.yml` tests PostgreSQL and the app. On `
 
 The deploy job checks Pages configuration before changing Supabase. If `configure-pages` reports `Get Pages site failed` with `Not Found`, open [repository Pages settings](https://github.com/louiscxcix/lspm/settings/pages), select **Build and deployment → Source → GitHub Actions**, save, and rerun the workflow. If the source is already selected, inspect that page for repository access or Pages availability restrictions. Automatic first-time enablement requires a separate token with the permissions documented by `actions/configure-pages`; the default workflow token cannot enable a missing site. The workflow does not request another token or bypass the check.
 
-`build:cloud` copies application assets only; it never opens SQLite or publishes project records. The older `build-public.js` remains available for explicit read-only snapshot exports and is not used by this workflow.
+`build:cloud` copies application assets only; it never opens SQLite or publishes project records. The old static snapshot publisher has been removed.
 
 ## Import the original data
 

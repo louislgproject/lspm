@@ -57,23 +57,14 @@ Each manual save, approved CSV batch, reviewed AI update, or project edit is com
 
 Input offers manual add, CSV append, and optional AI extraction. A same-name object requires an explicit reuse/separate choice. CSV previews all rows and requires row-level choices for global ID/name collisions; invalid batches save nothing. Relationship CSV accepts supported aliases and resolves unique names, but endpoints must already belong to the open project. Import objects or link Library objects first. Limits: 1,000 CSV rows and 2 MB per batch. Global deletion is intentionally unavailable until it has an impact review.
 
-AI extraction is off unless `GEMINI_API_KEY` is set on the local server. With a key, pressing **Extract draft** sends only the selected text or file to Gemini; it does **not** send the whole ontology. Review object matches, relationships, and any unresolved facts before pressing **Update ontology**. Accepted changes and their local ingestion record commit in one database transaction. Work notes may be confidential; obtain permission before sending them to an external AI provider. The implementation uses Google's [Gemini 3.8 Flash generateContent API and JSON output format](https://ai.google.dev/gemini-api/docs/generate-content/structured-output).
+AI extraction uses the server `OPENAI_API_KEY`. Extract sends only the selected text or file, not the whole ontology. Review the draft before updating the ontology.
 
 ```bash
-GEMINI_API_KEY="your-key" node server.js
+OPENAI_API_KEY="your-key" node server.js
 ```
-
-The API key remains in the server environment; do not put it in the browser, a checked-in file, or the database. Without a key, manual and CSV input still work offline. A live AI extraction has not been verified without your key.
 
 ## Check
 
 ```bash
-cd "/Users/louis/Desktop/lg/mex/ontology-app"
-node test.js
-node --test local-store.test.js server.test.js
-node --test wip.test.js
-node --test components.test.js production-logs.test.js
-node --test browser-smoke.test.js  # optional; requires Google Chrome on macOS
+npm test
 ```
-
-The older `firebase-store.js`, Firebase config, and cloud workspace code remain in this directory for now but are **not loaded** by the local app. No Firebase deployment is part of this local workflow.

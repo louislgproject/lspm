@@ -7,12 +7,12 @@ async function verifyBackend({baseUrl='https://ahzpuefosoajwwgbfhng.supabase.co'
     try{
       const response=await fetchImpl(endpoint,{headers:{Origin:origin},signal:AbortSignal.timeout(15000)});
       const body=await response.json().catch(()=>({}));
-      if(response.status===401&&body.error==='Sign in to open your workspace.'){
+      if(response.status===401&&body.error==='비밀번호를 입력하세요.'){
         if(response.headers.get('Access-Control-Allow-Origin')!==origin)throw Error('The deployed function does not allow the frontend origin.');
         const publicResponse=await fetchImpl(baseUrl+'/functions/v1/ontology/api/public/health',{headers:{Origin:origin},signal:AbortSignal.timeout(15000)});
         const publicBody=await publicResponse.json().catch(()=>({}));
         if(publicResponse.status!==200||publicBody.ok!==true||publicBody.readOnly!==true){
-          const code=publicBody.code||(publicBody.error==='Sign in to open your workspace.'?'PUBLIC_ROUTE_REQUIRES_LOGIN':'UNEXPECTED_RESPONSE');
+          const code=publicBody.code||(publicBody.error==='비밀번호를 입력하세요.'?'PUBLIC_ROUTE_REQUIRES_LOGIN':'UNEXPECTED_RESPONSE');
           throw Error('Public workspace check failed: HTTP '+publicResponse.status+', code '+String(code)+', stage '+String(publicBody.stage||'public-health')+'.');
         }
         const workspaceResponse=await fetchImpl(baseUrl+'/functions/v1/ontology/api/public/workspace',{headers:{Origin:origin},signal:AbortSignal.timeout(15000)});

@@ -13,12 +13,12 @@ test('release gate requires the actual application auth response and matching CO
     calls++;
     if(url.endsWith('/public/workspace'))return Response.json({projects:[],library:{entities:[],relations:[]}});
     if(url.includes('/public/'))return Response.json({ok:true,readOnly:true});
-    return options.method==='OPTIONS'?new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':origin}}):Response.json({error:'Sign in to open your workspace.'},{status:401,headers:{'Access-Control-Allow-Origin':origin}});
+    return options.method==='OPTIONS'?new Response(null,{status:204,headers:{'Access-Control-Allow-Origin':origin}}):Response.json({error:'비밀번호를 입력하세요.'},{status:401,headers:{'Access-Control-Allow-Origin':origin}});
   }});
   assert.equal(calls,4);
   // A gateway auth error must not masquerade as a healthy, running application.
   await assert.rejects(verifyBackend({attempts:1,fetchImpl:async()=>Response.json({message:'Missing authorization header'},{status:401})}),/release check failed/);
-  await assert.rejects(verifyBackend({attempts:1,fetchImpl:async()=>Response.json({error:'Sign in to open your workspace.'},{status:401})}),/frontend origin/);
+  await assert.rejects(verifyBackend({attempts:1,fetchImpl:async()=>Response.json({error:'비밀번호를 입력하세요.'},{status:401})}),/frontend origin/);
   await assert.rejects(verifyBackend({attempts:1,fetchImpl:async()=>Response.json({ok:true},{status:200})}),/HTTP 200/);
 });
 

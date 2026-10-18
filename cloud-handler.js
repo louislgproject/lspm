@@ -84,7 +84,7 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
         if(resolvePublishedOwner){const id=await resolvePublishedOwner();if(!id)return respond(503,{error:'편집할 작업공간을 찾지 못했습니다.'});user={id,workspaceId:id};}
         else user=await authenticate('master');
       }else{
-        if(!token)return respond(401,{error:'Sign in to open your workspace.'});
+        if(!token)return respond(401,{error:'비밀번호를 입력하세요.'});
         user=await authenticate(token);
       }
     }catch{return respond(401,{error:'비밀번호가 다릅니다.'});}

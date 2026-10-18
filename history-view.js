@@ -30,7 +30,7 @@
     update(ctx){
       if(!ctx||root.PUBLIC_READ_ONLY){this.seq++;for(const v of this.views.values()){v.bar.hidden=true;v.panel.hidden=true;}return;}
       this.ctx=ctx;const key=ctx.store.id+'|'+ctx.viewKey,changed=key!==this.key;this.key=key;this.view=this.mount(ctx.kind);
-      if(root.CLOUD_BACKEND){const add=this.view.bar.querySelector('[data-add]');add.disabled=true;add.title='일반 업무 기록 입력은 로컬에서, WIP 입력은 Progress에서 사용하세요.';}
+      if(!root.LocalAPI.historyAction)this.view.bar.querySelector('[data-add]').hidden=true;
       if(changed){
         this.settings={enabled:false,start:'',end:'',kind:'',basis:'occurred',verification:'',person:'',...ctx.workspace.viewSettings?.[ctx.store.id]?.eventHistory?.[ctx.viewKey]};
         const s=this.settings;
