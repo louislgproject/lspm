@@ -22,13 +22,14 @@ official model code. Confirm that the selected base route is shared. Each final
 part has its own object ID, observations, hourly measurements and Unit Time.
 Neither common process steps nor identical times merge different final parts.
 
-The migrations register **IB RH, IB LH, OB RH, OB LH** for every LQ2 model
-(STD, OPT and LWR), LH/RH only for primary light source, RH/LH for the other recorded LS models,
-and STD/OPT × RH/LH for the separate **T1-2 Lower** model. The complete catalog
-contains 40 final identities after the Primary correction. Existing identities and measurements are reused;
-official product codes and quantities are not generated. T1-2 Lower has no
-confirmed route: its children show **공정 미등록**, and neither Base nor Uplevel
-routes are assigned to it. Hourly quantities can still be entered per Lower part.
+The reviewed LS catalog has **36 final identities**. LQ2 STD and OPT each
+have IB/OB × LH/RH; Primary has LH/RH only. **LQ2 LWR has STD/OPT × LH/RH,
+with no IB/OB**. LWR STD retains Array cutting → LAM → Stacking → Screw
+assembly → EOL → Visual → Packing. LWR OPT adds ICT before Array cutting.
+**T1-2 Lower does not exist**; the owner corrected that earlier label.
+Mistaken Lower and LWR IB/OB identities are archived, and their original
+measurements remain readable without reassignment to STD/OPT. No official
+product codes, quantities or machine assets are generated.
 
 Parts menus use **family → model → final variant** groups. Process Map starts
 with model groups collapsed. Selecting a model selects all its final variants.
@@ -37,8 +38,12 @@ and input quantities share one map row. Differences in these records retain
 separate rows, including when the material/machine display layers are hidden.
 This visual grouping never merges stored object IDs or measurements.
 
-Progress opens the model groups and selects exactly one final part. Its selector
-and the Parts menu stay synchronized. Hourly output also uses final identities;
+Progress opens the model groups and selects exactly one final part. Group
+headings contain no multi-select checkbox; the group selection button chooses
+one of its final variants. The Parts menu, bottom selector and displayed route
+use the same selection, including when changing lines or reading historical
+parent-model observations. Part-scoped material relationships are checked
+before selecting process steps, as well as when rendering their context. Hourly output also uses final identities;
 different IB/OB and RH/LH quantities remain independent. Saved parent-model
 selections expand into their final children.
 Higher-level models remain in the ontology and existing higher-level records

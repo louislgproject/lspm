@@ -398,7 +398,7 @@ function render() {
   eventHistoryUI.update(!basicAccess&&!progressUI.active&&!hourlyUI.active&&['Overview','Production'].includes(activeTab)?{workspace,store,kind:activeTab==='Production'?'production':'overview',viewKey:activeTab==='Production'?'production':selectedWorkstream?'lens-'+selectedWorkstream:'overview',selection:mapSelectedIds,workstream:selectedWorkstream,groups:historyGroups,lineId:selectedWorkstream==='production'?store.entities.find(e=>e.type==='Resource'&&e.resourceKind==='line'&&e.name===$('#mapProductionLine').value)?.id||'':''}:null);
   const progressKind=activeTab==='Production'&&productionMode==='Process map'?'production':activeTab==='Overview'&&selectedWorkstream==='production'?'overview':'';
   const features=workspace.viewSettings?.[store.id]?.features||window.HourlyProduction.defaults(store);
-  progressUI.update(progressKind&&store.id!=='library'&&(basicAccess||features.wip)?{workspace,store,basic:basicAccess,kind:progressKind,partIds:progressKind==='production'?productionPartIds:mapPartIds,zoom:progressKind==='production'?productionZoom:zoom,selectPart:id=>{if(progressKind==='production'){productionPartIds=[id];productionPartsCustomized=true;}else{mapPartIds=[id];mapPartsCustomized=true;}},restore:s=>{if(progressKind==='production'){productionPartIds=[...s.ids];productionZoom=s.zoom;}else{mapPartIds=[...s.ids];zoom=s.zoom;}}}:null);
+  progressUI.update(progressKind&&store.id!=='library'&&(basicAccess||features.wip)?{workspace,store,basic:basicAccess,kind:progressKind,partIds:progressKind==='production'?productionPartIds:mapPartIds,zoom:progressKind==='production'?productionZoom:zoom,selectPart:id=>{if(progressKind==='production'){productionPartIds=id?[id]:[];productionPartsCustomized=true;}else{mapPartIds=id?[id]:[];mapPartsCustomized=true;}},restore:s=>{if(progressKind==='production'){productionPartIds=[...s.ids];productionZoom=s.zoom;}else{mapPartIds=[...s.ids];zoom=s.zoom;}}}:null);
   hourlyUI.update(!basicAccess&&features.hourly&&progressKind?{workspace,store,kind:progressKind,select:id=>{mapSelectedIds.clear();mapSelectedIds.add(id);decorateMapSelection();}}:null);
   document.querySelectorAll('.production-mode-toolbar').forEach(bar=>bar.hidden=true);
   if(progressKind&&(progressUI.ctx||hourlyUI.ctx)){
@@ -530,15 +530,18 @@ function renderTypeFilters() {
 function renderMapPartOptions() {
   const line=selectedWorkstream==='production'?$('#mapProductionLine').value:'';
   const finalOnly=selectedWorkstream==='production';
-  const parts=(finalOnly?window.FinalParts.list(store):store.entities.filter(Model.isProductPart)).filter(e=>!line||e.productionFamily===line).sort(partFamilyOrder);
-  if(finalOnly)mapPartIds=window.FinalParts.expand(store,mapPartIds);
-  if(!mapPartsCustomized)mapPartIds=parts.map(part=>part.id);
+  const progress=progressUI.enabled('overview',store);
+  const parts=(progress?progressUI.partChoices(store,'overview').map(id=>Model.byId(store,id)):finalOnly?window.FinalParts.list(store):store.entities.filter(Model.isProductPart)).filter(e=>!line||e.productionFamily===line).sort(partFamilyOrder);
+  if(progress)mapPartIds=progressUI.selection('overview',store,mapPartIds);
+  else if(finalOnly)mapPartIds=window.FinalParts.expand(store,mapPartIds);
+  if(!progress&&!mapPartsCustomized)mapPartIds=parts.map(part=>part.id);
   const ids=new Set(parts.map(part=>part.id));mapPartIds=mapPartIds.filter(id=>ids.has(id));
   if(!mapPartIds.includes(mapPartId))mapPartId=mapPartIds[0]||'';
   $('#mapPart').innerHTML='<option value="">All parts</option>'+parts.map(e=>'<option value="'+h(e.id)+'">'+h(e.name)+'</option>').join('');
   $('#mapPart').value=mapPartId;
   const term=$('#mapPartSearch').value.trim().toLowerCase();
   $('#mapPartChoices').innerHTML=partChoiceRows(parts,term,mapPartIds,'map');$('#mapPartChoices').querySelectorAll('[data-partial]').forEach(input=>input.indeterminate=true);
+  $('#mapPartMulti .map-part-actions').hidden=progress;
   $('#mapPartNav').hidden=true;
   $('#mapPartMulti').querySelector('summary').textContent=(finalOnly&&!progressUI.active?'Models · '+window.FinalParts.models(store,parts).filter(g=>g.parts.some(p=>mapPartIds.includes(p.id))).length+' / '+window.FinalParts.models(store,parts).length:(finalOnly?'Final parts':'Parts')+' · '+mapPartIds.length+' / '+parts.length);
   if(!mapPartIds.includes(mapHighlightPartId))mapHighlightPartId='';
@@ -547,12 +550,14 @@ function renderMapPartOptions() {
 }
 function renderProductionPartOptions() {
   const line=$('#productionLine').value;
-  const parts=window.FinalParts.list(store).filter(e=>!line||e.productionFamily===line).sort(partFamilyOrder);
-  productionPartIds=window.FinalParts.expand(store,productionPartIds);
-  if(!productionPartsCustomized)productionPartIds=parts.map(part=>part.id);
+  const progress=progressUI.enabled('production',store);
+  const parts=(progress?progressUI.partChoices(store,'production').map(id=>Model.byId(store,id)):window.FinalParts.list(store)).filter(e=>!line||e.productionFamily===line).sort(partFamilyOrder);
+  productionPartIds=progress?progressUI.selection('production',store,productionPartIds):window.FinalParts.expand(store,productionPartIds);
+  if(!progress&&!productionPartsCustomized)productionPartIds=parts.map(part=>part.id);
   const ids=new Set(parts.map(part=>part.id));productionPartIds=productionPartIds.filter(id=>ids.has(id));
   const term=$('#productionPartSearch').value.trim().toLowerCase();
   $('#productionPartChoices').innerHTML=partChoiceRows(parts,term,productionPartIds,'production');$('#productionPartChoices').querySelectorAll('[data-partial]').forEach(input=>input.indeterminate=true);
+  $('#productionPartMulti .map-part-actions').hidden=progress;
   $('#productionPartMulti summary').textContent=(!progressUI.active?'Models · '+window.FinalParts.models(store,parts).filter(g=>g.parts.some(p=>productionPartIds.includes(p.id))).length+' / '+window.FinalParts.models(store,parts).length:'Final parts · '+productionPartIds.length+' / '+parts.length);
   if(!productionPartIds.includes(productionHighlightPartId))productionHighlightPartId='';
   $('#productionHighlight').innerHTML='<option value="">All selected Parts</option>'+parts.filter(part=>productionPartIds.includes(part.id)).map(part=>'<option value="'+h(part.id)+'">'+h(part.name)+'</option>').join('');
@@ -562,13 +567,14 @@ const partFamily=part=>part.productionFamily?.trim()||'Unclassified';
 const partFamilyOrder=(a,b)=>partFamily(a).localeCompare(partFamily(b))||(a.productFamily||'').localeCompare(b.productFamily||'')||a.name.localeCompare(b.name);
 function partChoiceRows(parts,term,selected,prefix){
   const production=prefix==='production'||selectedWorkstream==='production',chosen=new Set(selected);
-  const leaf=part=>'<div class="map-part-choice"><label class="check"><input type="'+(production&&progressUI.active?'radio':'checkbox')+'" name="'+prefix+'-final-part" data-'+prefix+'-part-choice="'+h(part.id)+'"'+(chosen.has(part.id)?' checked':'')+'>'+h(window.FinalParts.label(part)+(part.modelCode?' · '+part.modelCode:''))+(part.routeStatus==='unregistered'?'<small>공정 미등록</small>':'')+'</label><button type="button" data-'+prefix+'-only="'+h(part.id)+'">Only</button></div>';
+  const leaf=part=>'<div class="map-part-choice"><label class="check"><input type="'+(production&&progressUI.active?'radio':'checkbox')+'" name="'+prefix+'-final-part" data-'+prefix+'-part-choice="'+h(part.id)+'"'+(chosen.has(part.id)?' checked':'')+'>'+h(window.FinalParts.label(part)+(part.modelCode?' · '+part.modelCode:'')+(progressUI.active&&!window.FinalParts.isFinal(store,part)?' · 기존 분류 (원본 실적)':''))+(part.routeStatus==='unregistered'?'<small>공정 미등록</small>':'')+'</label><button type="button" data-'+prefix+'-only="'+h(part.id)+'">Only</button></div>';
   const matches=part=>!term||window.FinalParts.label(part).toLowerCase().includes(term)||partFamily(part).toLowerCase().includes(term)||(part.productFamily||'').toLowerCase().includes(term)||(part.modelCode||'').toLowerCase().includes(term);
   let last='';const heading=part=>{const family=partFamily(part)+(part.productFamily?' / '+part.productFamily:''),text=family===last?'':'<strong class="part-family-heading">'+h(family)+'</strong>';last=family;return text;};
   if(!production)return parts.filter(matches).map(part=>heading(part)+leaf(part)).join('')||'<p class="muted">No matching Parts.</p>';
   return window.FinalParts.models(store,parts).filter(group=>group.parts.some(matches)).map(group=>{
     const shown=group.parts.filter(matches),ids=group.parts.map(p=>p.id),count=ids.filter(id=>chosen.has(id)).length;
-    return heading(group.parts[0])+'<details class="part-model-group"'+(progressUI.active||term?' open':'')+'><summary><label class="check"><input type="checkbox" data-'+prefix+'-model-choice="'+h(ids.join(','))+'"'+(count===ids.length?' checked':'')+(count&&count<ids.length?' data-partial="true"':'')+'>'+h(group.name)+' <small>'+group.parts.length+' 세부 파츠</small></label><button type="button" data-'+prefix+'-model-only="'+h(ids.join(','))+'">Only</button></summary><div class="part-model-children">'+shown.map(leaf).join('')+'</div></details>';
+    const title=progressUI.active?'<span>'+h(group.name)+' <small>'+group.parts.length+' 파트</small></span>':'<label class="check"><input type="checkbox" data-'+prefix+'-model-choice="'+h(ids.join(','))+'"'+(count===ids.length?' checked':'')+(count&&count<ids.length?' data-partial="true"':'')+'>'+h(group.name)+' <small>'+group.parts.length+' 세부 파츠</small></label>';
+    return heading(group.parts[0])+'<details class="part-model-group"'+(progressUI.active||term?' open':'')+'><summary>'+title+'<button type="button" data-'+prefix+'-model-only="'+h(ids.join(','))+'">'+(progressUI.active?'선택':'Only')+'</button></summary><div class="part-model-children">'+shown.map(leaf).join('')+'</div></details>';
   }).join('')||'<p class="muted">No matching Parts.</p>';
 }
 function durationLabel(seconds) {

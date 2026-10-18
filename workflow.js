@@ -178,6 +178,8 @@
     return result;
   }
   function productionGraph(project, {partId="", layers=["parts","people","resources","gates"], query="", start="", end="", showSubprocesses=true, expandedIds=null}={}) {
+    project={...project,relations:project.relations.filter(r=>!r.scopeProjectId||r.scopeProjectId===project.id)};
+    const productPart=partId&&M.isProductPart(M.byId(project,partId));
     const layer=new Set(layers), parts=new Set(partId?[partId]:[]);
     if(partId && M.byId(project,partId)?.type==='Part') {
       let count=-1;
@@ -187,14 +189,14 @@
     const expanded=expandedIds===null?null:new Set(expandedIds);
     const candidates=project.entities.filter(e=>e.type==='Production Step' && (showSubprocesses||!isSubprocess(e)) && (!expanded||!isSubprocess(e)||expanded.has(e.parentWorkId)) && overlaps(e,start,end) &&
       (!query||matched.has(e.id)||project.relations.some(r=>r.from===e.id&&matched.has(r.to)||r.to===e.id&&matched.has(r.from))||project.relations.some(scope=>scope.type==='assignment_scope'&&scope.to===e.id&&project.relations.some(r=>r.type==='assigned_to'&&r.from===scope.from&&matched.has(r.to)))));
-    const selected=new Set(candidates.filter(e=>!partId||project.relations.some(r=>r.from===e.id&&['applies_to','consumes','produces'].includes(r.type)&&parts.has(r.to))).map(e=>e.id));
+    const selected=new Set(candidates.filter(e=>!partId||project.relations.some(r=>r.from===e.id&&['applies_to','consumes','produces'].includes(r.type)&&parts.has(r.to)&&(!productPart||!r.routePartId||parts.has(r.routePartId)))).map(e=>e.id));
     if(partId){let count=-1;while(count!==selected.size){count=selected.size;for(const e of candidates)if(e.parentWorkId&&selected.has(e.parentWorkId))selected.add(e.id);}}
     const steps=candidates.filter(e=>selected.has(e.id));
     const stepIds=new Set(steps.map(e=>e.id)), ids=new Set(stepIds), relations=[];
     const group=e=>['Part','Part Revision'].includes(e.type)?'parts':['Person','Organization'].includes(e.type)?'people':e.type==='Resource'?'resources':e.type==='Gate'?'gates':'';
     for(const r of project.relations){
       const from=M.byId(project,r.from),to=M.byId(project,r.to);
-      if(partId&&r.routePartId&&!parts.has(r.routePartId))continue;
+      if(productPart&&r.routePartId&&!parts.has(r.routePartId))continue;
       if(stepIds.has(r.from)&&stepIds.has(r.to)) {relations.push(r);continue;}
       const other=stepIds.has(r.from)?to:stepIds.has(r.to)?from:null;
       if(other&&layer.has(group(other))) {ids.add(other.id);relations.push(r);}

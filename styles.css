@@ -755,4 +755,4 @@ body.map-resizing,body.map-resizing * {cursor:ns-resize!important;user-select:no
 .map-fullscreen .map-resize-bar {display:none;}
 .map-fullscreen :is(.map-size-target,.map-stage,#mapStage,#productionMapStage) {height:auto!important;min-height:0!important;max-height:none!important;flex:1 1 0!important;align-self:stretch!important;}
 
-body.production-progress-active :is(.map-part-actions,.part-model-group>summary input,.part-model-group>summary button) {display:none;}
+body.production-progress-active :is(.map-part-actions,.part-model-group>summary input) {display:none;}
