@@ -421,23 +421,22 @@ function render() {
 function placeMapResize(stage){
   if(stage.closest('.map-fullscreen'))return;
   const layout=stage.closest('.event-history-layout');
-  const anchor=layout||stage;
-  const target=layout||stage;
+  const anchor=layout||stage,target=anchor;
   let handle=anchor.parentElement.querySelector(':scope > .map-resize-bar');
   const apply=height=>{
-    const next=Math.round(Math.max(280,Math.min(4000,height)));
+    const next=Math.round(Math.max(240,Math.min(4000,height)));
     const overview=stage.closest('.overview');
-    if(overview){overview.style.height='auto';overview.style.overflow='visible';}
+    if(overview){overview.style.setProperty('height','auto','important');overview.style.setProperty('overflow','visible','important');}
     const mapPanel=stage.closest('.map-panel');
-    if(mapPanel){mapPanel.style.display='flex';mapPanel.style.flexDirection='column';mapPanel.style.height='auto';mapPanel.style.overflow='visible';}
+    if(mapPanel){mapPanel.style.setProperty('display','flex','important');mapPanel.style.setProperty('flex-direction','column','important');mapPanel.style.setProperty('height','auto','important');mapPanel.style.setProperty('overflow','visible','important');}
     const records=stage.closest('.records-view');
-    if(records)records.style.overflow='visible';
-    target.style.height=next+'px';
-    target.style.minHeight='0';
-    target.style.maxHeight='none';
-    target.style.flex='0 0 auto';
-    target.style.overflow='hidden';
-    if(layout){stage.style.height='100%';stage.style.minHeight='0';stage.style.maxHeight='none';stage.style.overflow='auto';}
+    if(records)records.style.setProperty('overflow','visible','important');
+    target.style.setProperty('height',next+'px','important');
+    target.style.setProperty('min-height','0','important');
+    target.style.setProperty('max-height',next+'px','important');
+    target.style.setProperty('flex','0 0 auto','important');
+    target.style.setProperty('overflow','hidden','important');
+    if(layout){stage.style.setProperty('height','100%','important');stage.style.setProperty('min-height','0','important');stage.style.setProperty('max-height','none','important');stage.style.setProperty('overflow','auto','important');}
     return next;
   };
   if(!handle){
@@ -448,12 +447,15 @@ function placeMapResize(stage){
     handle.setAttribute('aria-label','프로세스 맵 크기');
     handle.addEventListener('pointerdown',event=>{
       if(event.button!==0)return;
-      event.preventDefault();
-      event.stopPropagation();
-      const startY=event.clientY;
-      const startH=target.getBoundingClientRect().height;
+      event.preventDefault();event.stopPropagation();
+      const startY=event.clientY,startH=target.getBoundingClientRect().height,startBottom=target.getBoundingClientRect().bottom;
       handle.setPointerCapture(event.pointerId);
-      const move=ev=>{if(ev.pointerId===event.pointerId)apply(startH+ev.clientY-startY);};
+      const move=ev=>{
+        if(ev.pointerId!==event.pointerId)return;
+        apply(startH-(ev.clientY-startY));
+        const drift=target.getBoundingClientRect().bottom-startBottom;
+        if(Math.abs(drift)>0.5)window.scrollBy(0,drift);
+      };
       const end=ev=>{
         if(ev.pointerId!==event.pointerId)return;
         handle.removeEventListener('pointermove',move);
@@ -469,7 +471,7 @@ function placeMapResize(stage){
   anchor.before(handle);
   if(!target.dataset.mapSized){
     const saved=Number(localStorage.getItem('pm-map-height:'+stage.id));
-    apply(saved>=280&&saved<=4000?saved:Math.round(Math.min(window.innerHeight*0.62,720)));
+    apply(saved>=240&&saved<=4000?saved:Math.round(Math.min(window.innerHeight*0.62,720)));
     target.dataset.mapSized='1';
   }
 }
