@@ -16,7 +16,7 @@ function withVerifiedBackup({directory,key},operation){
   try{
     const decrypted=path.join(temp,'ontology.sqlite');
     const result=spawnSync('openssl',['enc','-d','-aes-256-cbc','-pbkdf2','-iter','200000','-in',encrypted,'-out',decrypted,'-pass','env:LSPM_DB_BACKUP_KEY'],{env:{...process.env,LSPM_DB_BACKUP_KEY:key.split(/\r?\n/)[0]},stdio:['ignore','ignore','pipe']});
-    if(result.error||result.status!==0)throw Error('Backup decryption failed. Verify that the repository secret contains the original key file contents.');
+    if(result.error||result.status!==0||!fs.existsSync(decrypted)||fs.readFileSync(decrypted).subarray(0,15).toString()!=='SQLite format 3')throw Error('Backup decryption failed. Verify that the repository secret contains the original key file contents.');
     fs.chmodSync(decrypted,0o600);
     if(sha256(decrypted)!==manifest.plaintextSha256)throw Error('Decrypted database checksum does not match its manifest.');
     db=new DatabaseSync(decrypted,{readOnly:true});
