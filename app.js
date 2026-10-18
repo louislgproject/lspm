@@ -212,11 +212,12 @@ async function startLocal() {
   if(!window.PUBLIC_READ_ONLY&&!window.CLOUD_BACKEND&&!localHost&&!previewHost){
     startupError='This version is local only. Start it with start-local.command, then open http://127.0.0.1:4173/.';render();return;
   }
+  if(window.EDIT_LOCKED){startupError='';render();return;}
   try {
     $('#projectList').innerHTML='<p class="muted" role="status">프로젝트 불러오는 중…</p>';
     if(LocalAPI.catalog){workspace=await LocalAPI.catalog();render();}
     workspace=await LocalAPI.load();basicAccess=workspace.access?.mode==='basic';window.OwnerAccess?.init(workspace.access,{whole:openWholeProcess,production:()=>openWorkstream('production')});const health=await LocalAPI.health();aiConfigured=health.aiConfigured;mapAssistantConfigured=Boolean(health.mapAssistantConfigured);copilotConfigured=Boolean(health.copilotConfigured);copilotModel=health.copilotModel||'';startupError='';route();
-  } catch (error) { startupError=/failed to fetch/i.test(error.message)?'Local server is offline. Open start-local.command and reload this page.':'Local database error: '+error.message;render(); }
+  } catch (error) { startupError=window.CLOUD_BACKEND||window.PUBLIC_READ_ONLY?error.message:(/failed to fetch/i.test(error.message)?'Local server is offline. Open start-local.command and reload this page.':'Local database error: '+error.message);render(); }
 }
 function invalidatePreview() { preview = null; $('#applyCSV').disabled = true; }
 function setInputMode(mode) {
@@ -336,7 +337,7 @@ function render() {
   $('#projectHome').hidden=Boolean(store); $('#projectShell').hidden=!store;
   $('#projectForm').hidden=!workspace||window.PUBLIC_READ_ONLY;
   $('#projectError').textContent=startupError;
-  $('#localStartHelp').hidden=!startupError;
+  $('#localStartHelp').hidden=!startupError||window.CLOUD_BACKEND||window.PUBLIC_READ_ONLY;
   const projectFilter=$('#projectTypeFilter').value,listed=(workspace?.projects||[]).filter(p=>!workspace.projectAliases?.[p.id]);
   $('#projectList').innerHTML=window.ProjectTypes.TYPES.filter(t=>!projectFilter||projectFilter===t.id).map(t=>{const group=listed.filter(p=>window.ProjectTypes.kind(p)===t.id);return group.length?'<section class="project-type-group"><h2>'+h(t.label)+' <small>'+group.length+'</small></h2><div class="project-type-cards">'+group.map(p=>'<article class="project-card"><a href="#/projects/'+encodeURIComponent(p.id)+'">'+h(p.name)+'</a><span>'+h(p.status)+(p.viewPending?' · 프로젝트 열기':' · '+p.entities.length+' objects')+'</span></article>').join('')+'</div></section>':'';}).join('');
   $('#editProjectType').hidden=!store||store.id==='library'||window.PUBLIC_READ_ONLY||basicAccess;

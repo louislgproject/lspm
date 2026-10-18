@@ -14,7 +14,7 @@
   panel.innerHTML='<form id="cloudSignIn"><label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label><button class="button primary" type="submit">열기</button></form><div id="cloudSignedIn" hidden><button class="button" id="cloudSignOut" type="button">닫기</button></div><p id="cloudAuthMessage" role="status"></p>';
   document.querySelector('.app-header').after(panel);
   const form=panel.querySelector('form'),message=panel.querySelector('#cloudAuthMessage');
-  const render=()=>{document.body.dataset.access=session?'owner':'anonymous';form.hidden=Boolean(session);panel.querySelector('#cloudSignedIn').hidden=!session;};
+  const render=()=>{root.EDIT_LOCKED=!session;document.body.dataset.access=session?'owner':'anonymous';form.hidden=Boolean(session);panel.querySelector('#cloudSignedIn').hidden=!session;};
   const save=value=>{session=value||'';if(session)sessionStorage.setItem(key,session);else sessionStorage.removeItem(key);render();};
   async function request(path,method='GET',value){
     if(!session)throw Error('비밀번호를 입력하세요.');
@@ -33,7 +33,9 @@
   }
   form.onsubmit=async event=>{
     event.preventDefault();const button=form.querySelector('[type=submit]');button.disabled=true;message.textContent='';
-    save(form.password.value);form.password.value='';location.reload();
+    save(form.password.value);form.password.value='';
+    try{await request('health');location.reload();}
+    catch(error){save('');message.textContent=error.message;button.disabled=false;}
   };
   panel.querySelector('#cloudSignOut').onclick=()=>{save('');location.reload();};
   render();
