@@ -16,7 +16,7 @@ async function verifyPages({url='https://louiscxcix.github.io/lspm/',attempts=12
    if(pending){
     await page.locator('#projectGate input[name=password]').fill('7777777');
     await page.locator('#projectGate [type=submit]').click();
-    await page.waitForFunction(()=>document.body.dataset.access==='owner'&&workspace.projects.some(p=>(p.entities||[]).length>0),null,{timeout:20000});
+    await page.waitForFunction(()=>typeof workspace!=='undefined'&&workspace&&document.body.dataset.access==='owner'&&workspace.projects.some(p=>(p.entities||[]).length>0),null,{timeout:20000});
    }else{
     await page.waitForFunction(()=>workspace.library.entities.length>0,null,{timeout:20000});
    }
