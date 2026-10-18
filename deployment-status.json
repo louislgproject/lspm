@@ -1,6 +1,11 @@
 {
-  "commit": "253e4592728f5af339a8d057535e662be4d3e875",
-  "runId": "39171172759",
-  "conclusion": "success",
-  "failedSteps": []
+  "commit": "64ba84399a0ee253fe8b6be7fea67d09311499f1",
+  "runId": "39172666111",
+  "conclusion": "failure",
+  "failedSteps": [
+    {
+      "job": "test",
+      "step": "Run npm test"
+    }
+  ]
 }
