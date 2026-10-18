@@ -59,4 +59,8 @@ ALTER TABLE production.reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE production.uploads ENABLE ROW LEVEL SECURITY;
 REVOKE ALL ON ALL TABLES IN SCHEMA production FROM PUBLIC;
 REVOKE ALL ON ALL SEQUENCES IN SCHEMA production FROM PUBLIC;
-INSERT INTO production.meta VALUES ('schemaVersion','1') ON CONFLICT DO NOTHING;
+-- Version 2: working reports stay editable; explicit upload replaces the prior snapshot.
+DROP TRIGGER IF EXISTS production_frozen ON production.reports;
+DROP TRIGGER IF EXISTS production_upload_frozen ON production.uploads;
+INSERT INTO production.meta VALUES ('schemaVersion','2')
+    ON CONFLICT (key) DO UPDATE SET value=EXCLUDED.value;

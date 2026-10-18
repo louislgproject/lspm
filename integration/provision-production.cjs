@@ -21,12 +21,14 @@ async function main(){
       IF to_regclass('production.meta') IS NULL THEN RAISE EXCEPTION 'Unknown existing production role; refusing rotation'; END IF;
       IF NOT EXISTS (SELECT 1 FROM production.meta WHERE key='credentialFingerprint' AND value='${fingerprint}') THEN RAISE EXCEPTION 'Production credential mismatch; existing access was not changed'; END IF;
     ELSE
+      IF to_regnamespace('production') IS NOT NULL THEN RAISE EXCEPTION 'Unknown existing production schema; refusing adoption'; END IF;
       CREATE ROLE lgls_production LOGIN NOINHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS PASSWORD '${verifier}';
     END IF;
   END $role$;`;
   const grants=`
     GRANT USAGE ON SCHEMA production TO lgls_production;
-    GRANT SELECT,INSERT ON production.meta,production.catalog,production.uploads TO lgls_production;
+    GRANT SELECT,INSERT ON production.meta,production.catalog TO lgls_production;
+    GRANT SELECT,INSERT,UPDATE,DELETE ON production.uploads TO lgls_production;
     GRANT SELECT,INSERT,UPDATE ON production.reports TO lgls_production;
     GRANT USAGE,SELECT,UPDATE ON ALL SEQUENCES IN SCHEMA production TO lgls_production;
     DO $policies$ DECLARE item TEXT; BEGIN
