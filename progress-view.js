@@ -41,7 +41,7 @@
       const container=this.view.stage.closest('.event-history-layout')||this.view.stage;if(this.active)container.after(this.view.bar);else container.before(this.view.bar);
       this.view.bar.querySelector('[data-progress-add]').disabled=ctx.store.status==='archived';
       this.view.bar.querySelector('[data-progress-add]').textContent=ctx.basic?'＋ 분석 데이터 추가 · 저장 안 됨':'＋ Progress 기록';
-      this.view.bar.querySelector('[data-final-part]').hidden=!!root.PUBLIC_READ_ONLY||ctx.basic;this.partOptions();this.view.bar.querySelector('[data-progress-model]').hidden=!!root.CLOUD_BACKEND||root.PUBLIC_READ_ONLY||ctx.basic;
+      this.view.bar.querySelector('[data-final-part]').hidden=!!root.PUBLIC_READ_ONLY||ctx.basic;this.partOptions();this.view.bar.querySelector('[data-progress-model]').hidden=!!root.PUBLIC_READ_ONLY||ctx.basic;
       document.body.classList.toggle('production-progress-active',this.active);
       if(this.active){this.load();if(this.data.snapshots.length)this.timeline(false);this.decorate();}
     }
@@ -71,7 +71,7 @@
     }
     dialog(title){const d=document.createElement('dialog');d.className='dialog progress-dialog';d.innerHTML='<header class="dialog-heading"><h2>'+esc(title)+'</h2><button class="button" data-close>Close</button></header><div data-body></div>';document.body.append(d);d.querySelector('[data-close]').onclick=()=>d.close();d.onclose=()=>d.remove();d.showModal();return d;}
     registerModel(){
-      if(root.CLOUD_BACKEND||root.PUBLIC_READ_ONLY||this.ctx.basic)return;const d=this.dialog('모델 코드 → 기존 공정 연결'),body=d.querySelector('[data-body]'),parts=this.ctx.store.entities.filter(p=>M.isProductPart(p)&&G.steps(this.ctx.store,p.id).length);
+      if(root.PUBLIC_READ_ONLY||this.ctx.basic)return;const d=this.dialog('모델 코드 → 기존 공정 연결'),body=d.querySelector('[data-body]'),parts=this.ctx.store.entities.filter(p=>M.isProductPart(p)&&G.steps(this.ctx.store,p.id).length);
       body.innerHTML='<p>확인된 동일 공정만 선택하세요. 기존 Part·공정·과거 수량은 변경하지 않고 코드별 하위 품목을 추가합니다.</p><div class="form-grid"><label>공유할 기존 경로<select data-base>'+parts.map(p=>'<option value="'+esc(p.id)+'">'+esc(p.name+(p.modelCode?' · '+p.modelCode:''))+'</option>').join('')+'</select></label><label>모델 코드<input data-code maxlength="120" required></label><label>품목명<input data-name maxlength="180"></label><label>Side<select data-side><option value="">미확정</option><option>LH</option><option>RH</option></select></label><label>Position<select data-position><option value="">미확정</option><option>Upper</option><option>Lower</option></select></label></div><p data-error role="alert"></p><button class="button primary" data-register>확인한 코드·공정 저장</button>';
       body.querySelector('[data-register]').onclick=async e=>{try{const code=body.querySelector('[data-code]').value.trim();if(this.ctx.workspace.library.entities.some(p=>p.modelCode===code&&(p.codeNamespace||'LS MES')==='LS MES'))throw Error('이 코드는 전역 DB에 이미 있습니다. 기존 품목을 프로젝트에 연결하세요.');const next=structuredClone(this.ctx.workspace),project=next.projects.find(p=>p.id===this.ctx.store.id);G.registerModel(project,{basePartId:body.querySelector('[data-base]').value,modelCode:code,name:body.querySelector('[data-name]').value.trim(),side:body.querySelector('[data-side]').value,verticalPosition:body.querySelector('[data-position]').value});e.target.disabled=true;const result=await root.LocalAPI.save(next,project.id,this.ctx.workspace.revision);d.close();await this.refreshApp(result);}catch(err){body.querySelector('[data-error]').textContent=err.message;e.target.disabled=false;}};
     }
