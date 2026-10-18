@@ -1,23 +1,25 @@
--- Owner answers: LH matches RH, Upper/Lower/RH/LH share one process,
--- and Jewelry is ICT then Router then shipment. No new Main Plate is created.
+-- Owner answers: every G65 Upper/Lower hand shares the recorded lamp process,
+-- LH has the same connector and plastics as RH, and Jewelry is ICT, Router, then shipment.
+-- Numbered pieces 1 and 2 already exist. Do not create a second "Plate" identity.
 DO $$
 DECLARE
  selected_owner UUID; selected_project TEXT; spec RECORD; flow RECORD; variant_id TEXT; child_id TEXT; step_id TEXT;
- part_id TEXT; link_id TEXT; route_id TEXT; material_id TEXT; changed INTEGER:=0; affected INTEGER;
- child_name TEXT; child_data JSONB;
+ link_id TEXT; route_id TEXT; material_id TEXT; changed INTEGER:=0; affected INTEGER; child_name TEXT; child_data JSONB;
 BEGIN
  SELECT owner_id INTO selected_owner FROM pm.publication WHERE singleton=true;
  SELECT p.id INTO selected_project FROM pm.projects p WHERE p.owner_id=selected_owner AND p.name='LS' AND p.status='active' LIMIT 1;
  IF selected_project IS NULL THEN RETURN; END IF;
 
- -- The recorded G65 lamp route is shared by every Upper/Lower hand.
  FOR spec IN SELECT e.id AS variant_id FROM pm.entities e
    JOIN pm.project_memberships m ON m.owner_id=e.owner_id AND m.entity_id=e.id
    WHERE e.owner_id=selected_owner AND m.project_id=selected_project AND e.type='Part'
-    AND e.data_json::jsonb->>'name' IN ('G65 Upper','G65 Lower','G65 Upper RH','G65 Upper LH','G65 Lower RH','G65 Lower LH') LOOP
+    AND e.data_json::jsonb->>'name' IN ('G65 Upper','G65 Lower','G65 Upper RH','G65 Upper LH','G65 Lower RH','G65 Lower LH')
+    AND e.data_json::jsonb->>'status' IS DISTINCT FROM 'archived' LOOP
   FOR step_id IN SELECT DISTINCT r.from_id FROM pm.relations r
     JOIN pm.entities base ON base.owner_id=r.owner_id AND base.id=r.to_id
-    WHERE r.owner_id=selected_owner AND r.type='applies_to' AND base.data_json::jsonb->>'name'='G65 main (route label)' LOOP
+    JOIN pm.entities step ON step.owner_id=r.owner_id AND step.id=r.from_id
+    WHERE r.owner_id=selected_owner AND r.type='applies_to' AND base.data_json::jsonb->>'name'='G65 main (route label)'
+     AND step.type='Production Step' AND step.data_json::jsonb->>'status' IS DISTINCT FROM 'archived' LOOP
    route_id:='shared-g65-'||substr(md5(step_id||'>'||spec.variant_id),1,20);
    INSERT INTO pm.relations(owner_id,id,type,from_id,to_id,scope_project_id,data_json)
    SELECT selected_owner,route_id,'applies_to',step_id,spec.variant_id,NULL,
@@ -27,7 +29,6 @@ BEGIN
   END LOOP;
  END LOOP;
 
- -- Same intermediate pieces on every hand. Existing RH pieces are reused.
  FOR spec IN SELECT * FROM (VALUES
   ('G65 Upper RH','RH','Upper'),
   ('G65 Upper LH','LH','Upper'),
@@ -37,19 +38,14 @@ BEGIN
   SELECT e.id INTO variant_id FROM pm.entities e
    JOIN pm.project_memberships m ON m.owner_id=e.owner_id AND m.entity_id=e.id
    WHERE e.owner_id=selected_owner AND m.project_id=selected_project AND e.type='Part' AND e.data_json::jsonb->>'name'=spec.variant_name
+    AND e.data_json::jsonb->>'status' IS DISTINCT FROM 'archived'
    ORDER BY e.rowid LIMIT 1;
   IF variant_id IS NULL THEN CONTINUE; END IF;
   FOR flow IN SELECT * FROM (VALUES
-   ('Plate 1','1','G65 main (route label) · Router','produces',2,'confirmed'),
-   ('Plate 2','2','G65 main (route label) · Router','produces',2,'confirmed'),
-   ('Plate 1','1','G65 · Integration','consumes',NULL,'proposed'),
-   ('Plate 2','2','G65 · Integration','consumes',NULL,'proposed'),
-   ('Connector','','G65 · Integration','consumes',NULL,'proposed'),
-   ('main','','G65 · Integration','produces',NULL,'proposed'),
-   ('main','','G65 main (route label) · LAM assembly','consumes',NULL,'proposed'),
-   ('Black Plastic','','G65 main (route label) · LAM assembly','consumes',NULL,'proposed'),
-   ('Crystal Plastic','','G65 main (route label) · LAM assembly','consumes',NULL,'proposed')
-  ) AS f(piece,piece_index,step_name,rel_type,qty,review_state) LOOP
+   ('Connector','G65 · Integration'),
+   ('Black Plastic','G65 main (route label) · LAM assembly'),
+   ('Crystal Plastic','G65 main (route label) · LAM assembly')
+  ) AS f(piece,step_name) LOOP
    child_name:=spec.variant_name||' '||flow.piece;
    SELECT e.id INTO child_id FROM pm.entities e
     JOIN pm.project_memberships m ON m.owner_id=e.owner_id AND m.entity_id=e.id
@@ -57,10 +53,7 @@ BEGIN
     ORDER BY e.rowid LIMIT 1;
    IF child_id IS NULL THEN
     child_id:='ls-comp-'||substr(md5(child_name),1,20);
-    child_data:=jsonb_strip_nulls(jsonb_build_object(
-     'id',child_id,'type','Part','name',child_name,'status','active','itemKind','component','productionFamily','LDM','productFamily','G65',
-     'side',spec.side_name,'verticalPosition',spec.vertical_name,'pieceIndex',nullif(flow.piece_index,''),
-     'context','Same intermediate structure on every G65 Upper/Lower hand. Not a shipped output.'));
+    child_data:=jsonb_build_object('id',child_id,'type','Part','name',child_name,'status','active','itemKind','component','productionFamily','LDM','productFamily','G65','side',spec.side_name,'verticalPosition',spec.vertical_name,'context','Same connector or plastic on every G65 Upper/Lower hand. Not a shipped output.');
     INSERT INTO pm.entities(owner_id,id,type,data_json) VALUES(selected_owner,child_id,'Part',child_data::text);
     INSERT INTO pm.project_memberships(owner_id,project_id,entity_id) VALUES(selected_owner,selected_project,child_id);
     INSERT INTO pm.project_workstreams(owner_id,project_id,entity_id,code) VALUES(selected_owner,selected_project,child_id,'production');
@@ -74,24 +67,20 @@ BEGIN
    GET DIAGNOSTICS affected=ROW_COUNT; changed:=changed+affected;
    SELECT e.id INTO step_id FROM pm.entities e WHERE e.owner_id=selected_owner AND e.type='Production Step' AND e.data_json::jsonb->>'name'=flow.step_name ORDER BY e.rowid LIMIT 1;
    IF step_id IS NULL THEN CONTINUE; END IF;
-   material_id:='hand-mat-'||substr(md5(step_id||flow.rel_type||child_id||variant_id),1,20);
+   material_id:='hand-mat-'||substr(md5(step_id||'consumes'||child_id||variant_id),1,20);
    INSERT INTO pm.relations(owner_id,id,type,from_id,to_id,scope_project_id,data_json)
-   SELECT selected_owner,material_id,flow.rel_type,step_id,child_id,NULL,jsonb_strip_nulls(jsonb_build_object(
-    'id',material_id,'type',flow.rel_type,'from',step_id,'to',child_id,'routePartId',variant_id,
-    'quantity',flow.qty,'unit',CASE WHEN flow.qty IS NULL THEN NULL ELSE 'piece' END,
-    'reviewState',flow.review_state,
-    'evidence','Owner confirmed this hand uses the same pieces and the same process.'))::text
-   WHERE NOT EXISTS(SELECT 1 FROM pm.relations r WHERE r.owner_id=selected_owner AND r.type=flow.rel_type AND r.from_id=step_id AND r.to_id=child_id AND r.data_json::jsonb->>'routePartId'=variant_id);
+   SELECT selected_owner,material_id,'consumes',step_id,child_id,NULL,
+    jsonb_build_object('id',material_id,'type','consumes','from',step_id,'to',child_id,'routePartId',variant_id,'reviewState','proposed','evidence','Owner confirmed this hand uses the same connector and plastics.')::text
+   WHERE NOT EXISTS(SELECT 1 FROM pm.relations r WHERE r.owner_id=selected_owner AND r.type='consumes' AND r.from_id=step_id AND r.to_id=child_id AND coalesce(r.data_json::jsonb->>'routePartId','')=variant_id);
    GET DIAGNOSTICS affected=ROW_COUNT; changed:=changed+affected;
   END LOOP;
  END LOOP;
 
- -- Jewelry ships after ICT and Router. It does not take the lamp route.
  FOR flow IN SELECT * FROM (VALUES
-  ('ls-step-g65-jewelry-ict','G65 Jewelry Piece · ICT','ICT',1),
-  ('ls-step-g65-jewelry-router','G65 Jewelry Piece · Router','Router',2),
-  ('ls-step-g65-jewelry-ship','G65 Jewelry Piece · 출고','출고',3)
- ) AS s(step_key,step_name,stage_name,ord) LOOP
+  ('ls-step-g65-jewelry-ict','G65 Jewelry Piece · ICT','ICT'),
+  ('ls-step-g65-jewelry-router','G65 Jewelry Piece · Router','Router'),
+  ('ls-step-g65-jewelry-ship','G65 Jewelry Piece · 출고','출고')
+ ) AS s(step_key,step_name,stage_name) LOOP
   IF NOT EXISTS(SELECT 1 FROM pm.entities e WHERE e.owner_id=selected_owner AND e.id=flow.step_key) THEN
    INSERT INTO pm.entities(owner_id,id,type,data_json) VALUES(selected_owner,flow.step_key,'Production Step',jsonb_build_object(
     'id',flow.step_key,'type','Production Step','name',flow.step_name,'status','active','processLevel','main','productionStage',flow.stage_name,
