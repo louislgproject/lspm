@@ -419,11 +419,11 @@ function render() {
   samplePreparationUI.update(showPreparation?{workspace,store,container:$('#samplePreparationPanel'),readOnly:window.PUBLIC_READ_ONLY||basicAccess}:null);
 }
 function placeMapResize(stage){
-  const layout=stage.closest('.event-history-layout'),host=layout||stage.parentElement;
-  let handle=host.querySelector(':scope > .map-resize-bar');
+  const anchor=stage.closest('.event-history-layout')||stage;
+  let handle=anchor.parentElement.querySelector(':scope > .map-resize-bar');
   if(!handle){
     handle=document.createElement('div');handle.className='map-resize-bar';handle.tabIndex=0;handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','horizontal');handle.setAttribute('aria-label','프로세스 맵 크기');
-    const apply=height=>{const next=Math.round(Math.max(220,Math.min(window.innerHeight*1.8,height)));stage.style.setProperty('--map-h',next+'px');stage.classList.add('map-user-height');localStorage.setItem('pm-map-height:'+stage.id,String(next));};
+    const apply=height=>{const next=Math.round(Math.max(280,Math.min(window.innerHeight*1.8,height)));stage.style.setProperty('--map-h',next+'px');stage.classList.add('map-user-height');localStorage.setItem('pm-map-height:'+stage.id,String(next));};
     handle.onpointerdown=event=>{
       if(event.button!==0)return;event.preventDefault();
       const startY=event.clientY,startH=stage.getBoundingClientRect().height;
@@ -434,9 +434,9 @@ function placeMapResize(stage){
     };
     handle.onkeydown=event=>{if(event.key!=='ArrowUp'&&event.key!=='ArrowDown')return;event.preventDefault();apply(stage.getBoundingClientRect().height+(event.key==='ArrowDown'?48:-48));};
   }
-  if(layout)layout.append(handle);else stage.after(handle);
+  anchor.after(handle);
   const saved=Number(localStorage.getItem('pm-map-height:'+stage.id));
-  if(saved){stage.style.setProperty('--map-h',saved+'px');stage.classList.add('map-user-height');}
+  if(saved>=280){stage.style.setProperty('--map-h',saved+'px');stage.classList.add('map-user-height');}
 }
 function renderProjectEntry() {
   const workstreams=store.workstreams||{};
