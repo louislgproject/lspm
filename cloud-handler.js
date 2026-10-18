@@ -16,7 +16,7 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
     const headers=new Headers({'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin'});
     const respond=(status,value)=>new Response(JSON.stringify(value),{status,headers});
     if(origin&&!origins.has(origin))return respond(403,{error:'Origin not allowed.'});
-    if(origin){headers.set('Access-Control-Allow-Origin',origin);headers.set('Access-Control-Allow-Headers','authorization,apikey,content-type,x-client-info,x-project-access');headers.set('Access-Control-Allow-Methods','GET,POST,PUT,OPTIONS');}
+    if(origin){headers.set('Access-Control-Allow-Origin',origin);headers.set('Access-Control-Allow-Headers','authorization,apikey,content-type,x-client-info,x-project-access,x-edit-password');headers.set('Access-Control-Allow-Methods','GET,POST,PUT,OPTIONS');}
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers});
     const url=new URL(request.url);
     // Supabase's gateway strips /functions/v1 before forwarding to the runtime.
