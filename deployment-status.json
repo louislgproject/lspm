@@ -1,11 +1,6 @@
 {
-  "commit": "b679cf76330bcd78c8e7e7ba22e761675ca24c58",
-  "runId": "39172913193",
-  "conclusion": "failure",
-  "failedSteps": [
-    {
-      "job": "deploy",
-      "step": "Verify authenticated editor persistence and isolation"
-    }
-  ]
+  "commit": "9f815e0bed08a806e61ef2e5c7d0190736a8f72d",
+  "runId": "39173068553",
+  "conclusion": "success",
+  "failedSteps": []
 }
