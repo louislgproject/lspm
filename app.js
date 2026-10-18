@@ -402,48 +402,41 @@ function render() {
   hourlyUI.update(!basicAccess&&features.hourly&&progressKind?{workspace,store,kind:progressKind,select:id=>{mapSelectedIds.clear();mapSelectedIds.add(id);decorateMapSelection();}}:null);
   document.querySelectorAll('.production-mode-toolbar').forEach(bar=>bar.hidden=true);
   if(progressKind&&(progressUI.ctx||hourlyUI.ctx)){
-    const stage=$('#'+(progressKind==='production'?'productionMapStage':'mapStage')),anchor=stage.closest('.event-history-layout')||stage;
-    let stack=anchor.closest('.map-stack');
-    if(!stack){stack=document.createElement('div');stack.className='map-stack';anchor.before(stack);stack.append(anchor);}
-    else if(anchor.parentElement!==stack)stack.append(anchor);
-    let bar=stack.parentElement.querySelector(':scope > .production-mode-toolbar')||document.querySelector('.production-mode-toolbar');
-    if(!bar||bar.parentElement!==stack.parentElement){bar=document.createElement('nav');bar.className='production-mode-toolbar';bar.setAttribute('aria-label','Production data views');}
-    stack.before(bar);bar.hidden=false;
+    const stage=$('#'+(progressKind==='production'?'productionMapStage':'mapStage')),container=stage.closest('.event-history-layout')||stage;
+    let bar=container.parentElement.querySelector(':scope > .production-mode-toolbar');
+    if(!bar){bar=document.createElement('nav');bar.className='production-mode-toolbar';bar.setAttribute('aria-label','Production data views');}
+    container.before(bar);bar.hidden=false;
     if(progressUI.ctx){bar.append(progressUI.toggleButton);progressUI.view.bar.hidden=!progressUI.active;}
     if(hourlyUI.ctx){bar.append(hourlyUI.toggleButton);hourlyUI.bar.hidden=!hourlyUI.active;}
-    let split=stack.querySelector(':scope > .analysis-split');
-    if(!split){
-      split=document.createElement('div');split.className='analysis-split';split.hidden=true;
-      split.innerHTML='<div class="analysis-pane" data-pane="progress"></div><div class="analysis-split-bar" role="separator" aria-orientation="horizontal" aria-label="위아래 크기"></div><div class="analysis-pane" data-pane="hourly"></div>';
-      const handle=split.querySelector('.analysis-split-bar');
-      handle.onpointerdown=event=>{
-        if(event.button!==0)return;event.preventDefault();
-        const progress=split.querySelector('[data-pane="progress"]'),hourly=split.querySelector('[data-pane="hourly"]'),top=progress.hidden?hourly:progress,startY=event.clientY,startH=top.getBoundingClientRect().height;
-        handle.setPointerCapture(event.pointerId);
-        const move=ev=>{const limit=Math.max(160,stack.clientHeight-160),height=Math.round(Math.max(72,Math.min(limit,startH+ev.clientY-startY)));top.style.flex='0 0 '+height+'px';localStorage.setItem('pm-analysis-split',String(height));};
-        const end=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',end);handle.removeEventListener('pointercancel',end);};
-        handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);
-      };
-    }
-    stack.prepend(split);
-    if(progressUI.view?.bar)split.querySelector('[data-pane="progress"]').append(progressUI.view.bar);
-    if(hourlyUI.bar)split.querySelector('[data-pane="hourly"]').append(hourlyUI.bar,hourlyUI.table);
-    const both=progressUI.active&&hourlyUI.active,saved=Number(localStorage.getItem('pm-analysis-split'));
-    split.hidden=!(progressUI.active||hourlyUI.active);
-    const progressPane=split.querySelector('[data-pane="progress"]'),hourlyPane=split.querySelector('[data-pane="hourly"]');
-    progressPane.hidden=!progressUI.active;hourlyPane.hidden=!hourlyUI.active;
-    split.querySelector('.analysis-split-bar').hidden=!(progressUI.active||hourlyUI.active);
-    const sized=progressUI.active?progressPane:hourlyPane;
-    if(saved)sized.style.flex='0 0 '+saved+'px';
-    if(!both&&progressUI.active)hourlyPane.style.flex='';
-    if(!both&&hourlyUI.active)progressPane.style.flex='';
   }
+  const sizedMap=activeTab==='Production'&&productionMode==='Process map'?$('#productionMapStage'):['Overview','Timeline'].includes(activeTab)?$('#mapStage'):null;
+  if(sizedMap)placeMapResize(sizedMap);
   renderSavedChange();
   mapAssistantUI.update();
   const sampleRisk=activeTab==='Risk / Issues'&&window.SamplePreparation.isSample(store)&&!basicAccess,showPreparation=sampleRisk&&sampleRiskMode==='preparation';
   $('#sampleRiskTabs').hidden=!sampleRisk;$('#samplePreparationPanel').hidden=!showPreparation;$('#recordsTable').hidden=showPreparation;
   $('#sampleRiskTabs').querySelectorAll('[data-sample-risk]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.sampleRisk===sampleRiskMode)));
   samplePreparationUI.update(showPreparation?{workspace,store,container:$('#samplePreparationPanel'),readOnly:window.PUBLIC_READ_ONLY||basicAccess}:null);
+}
+function placeMapResize(stage){
+  const layout=stage.closest('.event-history-layout'),host=layout||stage.parentElement;
+  let handle=host.querySelector(':scope > .map-resize-bar');
+  if(!handle){
+    handle=document.createElement('div');handle.className='map-resize-bar';handle.tabIndex=0;handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','horizontal');handle.setAttribute('aria-label','프로세스 맵 크기');
+    const apply=height=>{const next=Math.round(Math.max(220,Math.min(window.innerHeight*1.8,height)));stage.style.setProperty('--map-h',next+'px');stage.classList.add('map-user-height');localStorage.setItem('pm-map-height:'+stage.id,String(next));};
+    handle.onpointerdown=event=>{
+      if(event.button!==0)return;event.preventDefault();
+      const startY=event.clientY,startH=stage.getBoundingClientRect().height;
+      handle.setPointerCapture(event.pointerId);
+      const move=ev=>apply(startH+ev.clientY-startY);
+      const end=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',end);handle.removeEventListener('pointercancel',end);};
+      handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);
+    };
+    handle.onkeydown=event=>{if(event.key!=='ArrowUp'&&event.key!=='ArrowDown')return;event.preventDefault();apply(stage.getBoundingClientRect().height+(event.key==='ArrowDown'?48:-48));};
+  }
+  if(layout)layout.append(handle);else stage.after(handle);
+  const saved=Number(localStorage.getItem('pm-map-height:'+stage.id));
+  if(saved){stage.style.setProperty('--map-h',saved+'px');stage.classList.add('map-user-height');}
 }
 function renderProjectEntry() {
   const workstreams=store.workstreams||{};
