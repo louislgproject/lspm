@@ -1,11 +1,11 @@
 {
-  "commit": "64ba84399a0ee253fe8b6be7fea67d09311499f1",
-  "runId": "39172666111",
+  "commit": "18e7dae0a671faec678bc4cae84638258c67a32f",
+  "runId": "39172752072",
   "conclusion": "failure",
   "failedSteps": [
     {
-      "job": "test",
-      "step": "Run npm test"
+      "job": "deploy",
+      "step": "Verify authenticated editor persistence and isolation"
     }
   ]
 }
