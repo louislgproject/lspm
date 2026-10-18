@@ -424,13 +424,14 @@ function placeMapResize(stage){
   const anchor=layout||stage;
   const panel=anchor.parentElement;
   let handle=panel.querySelector(':scope > .map-resize-bar');
+  const box=()=>layout||stage;
   const apply=height=>{
-    const next=Math.round(Math.max(240,Math.min(window.innerHeight*1.8,height)));
-    stage.style.setProperty('height',layout? '100%':next+'px','important');
+    const next=Math.round(Math.max(240,Math.min(6000,height)));
+    stage.style.setProperty('height',next+'px','important');
     stage.style.setProperty('min-height','0','important');
-    stage.style.setProperty('max-height','none','important');
+    stage.style.setProperty('max-height',next+'px','important');
     stage.style.setProperty('overflow','auto','important');
-    stage.style.setProperty('align-self','stretch','important');
+    stage.style.setProperty('flex','1 1 0px','important');
     if(layout){
       layout.style.setProperty('height',next+'px','important');
       layout.style.setProperty('min-height','0','important');
@@ -441,9 +442,8 @@ function placeMapResize(stage){
     const overview=stage.closest('.overview');
     if(overview){overview.style.setProperty('height','auto','important');overview.style.setProperty('max-height','none','important');overview.style.setProperty('overflow','visible','important');}
     const mapPanel=stage.closest('.map-panel');
-    if(mapPanel){mapPanel.style.setProperty('display','flex','important');mapPanel.style.setProperty('flex-direction','column','important');mapPanel.style.setProperty('height','auto','important');mapPanel.style.setProperty('overflow','visible','important');}
-    const records=stage.closest('.records-view');
-    if(records)records.style.setProperty('overflow','visible','important');
+    if(mapPanel){mapPanel.style.setProperty('display','flex','important');mapPanel.style.setProperty('flex-direction','column','important');mapPanel.style.setProperty('height','auto','important');mapPanel.style.setProperty('max-height','none','important');mapPanel.style.setProperty('overflow','visible','important');}
+    for(const node of [stage.closest('.records-view'),stage.closest('#productionView')])if(node){node.style.setProperty('overflow','visible','important');node.style.setProperty('max-height','none','important');}
     if(handle)handle.setAttribute('aria-valuenow',String(next));
     return next;
   };
@@ -452,15 +452,29 @@ function placeMapResize(stage){
     handle.addEventListener('pointerdown',event=>{
       if(event.button!==0)return;
       event.preventDefault();event.stopPropagation();
-      const startY=event.clientY,startH=stage.getBoundingClientRect().height;
+      const startY=event.clientY,startH=box().getBoundingClientRect().height;
+      handle.setPointerCapture(event.pointerId);
       handle.classList.add('is-dragging');let last=startH;
-      const move=ev=>{ev.preventDefault();last=apply(startH+ev.clientY-startY);};
-      const end=()=>{handle.classList.remove('is-dragging');window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',end,true);window.removeEventListener('pointercancel',end,true);localStorage.setItem('pm-map-height:'+stage.id,String(Math.round(last)));};
-      window.addEventListener('pointermove',move,true);
-      window.addEventListener('pointerup',end,true);
-      window.addEventListener('pointercancel',end,true);
+      const move=ev=>{
+        if(ev.pointerId!==event.pointerId)return;
+        ev.preventDefault();
+        last=apply(startH+ev.clientY-startY);
+        const edge=box().getBoundingClientRect().bottom,room=window.innerHeight-12;
+        if(edge>room)window.scrollBy(0,edge-room);
+      };
+      const end=ev=>{
+        if(ev.pointerId!==event.pointerId)return;
+        handle.classList.remove('is-dragging');
+        handle.removeEventListener('pointermove',move);
+        handle.removeEventListener('pointerup',end);
+        handle.removeEventListener('pointercancel',end);
+        localStorage.setItem('pm-map-height:'+stage.id,String(Math.round(last)));
+      };
+      handle.addEventListener('pointermove',move);
+      handle.addEventListener('pointerup',end);
+      handle.addEventListener('pointercancel',end);
     });
-    handle.addEventListener('keydown',event=>{if(event.key!=='ArrowUp'&&event.key!=='ArrowDown')return;event.preventDefault();const next=apply(stage.getBoundingClientRect().height+(event.key==='ArrowDown'?48:-48));localStorage.setItem('pm-map-height:'+stage.id,String(next));});
+    handle.addEventListener('keydown',event=>{if(event.key!=='ArrowUp'&&event.key!=='ArrowDown')return;event.preventDefault();const next=apply(box().getBoundingClientRect().height+(event.key==='ArrowDown'?80:-80));localStorage.setItem('pm-map-height:'+stage.id,String(next));});
   }
   anchor.before(handle);
   const saved=Number(localStorage.getItem('pm-map-height:'+stage.id));
