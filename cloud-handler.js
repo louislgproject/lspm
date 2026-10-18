@@ -78,10 +78,11 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
     }
     const token=request.headers.get('authorization')?.match(/^Bearer (\S+)$/i)?.[1];
     const editPassword=request.headers.get('x-edit-password')||'';
-    let user;
+    let user,master=false;
     try{
       if(editPassword){
         if(!require('./edit-password').ok(editPassword))return respond(401,{error:'비밀번호가 다릅니다.'});
+        master=true;
         if(request.method==='GET'&&pathname==='/api/health')return respond(200,{ok:true,aiConfigured:Boolean(openaiKey),mapAssistantConfigured:Boolean(openaiKey),copilotConfigured:Boolean(openaiKey),copilotModel:openaiKey?'gpt-6-luna':''});
         if(resolvePublishedOwner){const id=await resolvePublishedOwner();if(!id)return respond(503,{error:'편집할 작업공간을 찾지 못했습니다.'});user={id,workspaceId:id};}
         else user=await authenticate('master');
@@ -92,7 +93,7 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
     }catch{return respond(401,{error:'비밀번호가 다릅니다.'});}
     if(!user?.id)return respond(401,{error:'비밀번호가 다릅니다.'});
     if(request.method==='GET'&&pathname==='/api/health')return respond(200,{ok:true,aiConfigured:Boolean(openaiKey),mapAssistantConfigured:Boolean(openaiKey),copilotConfigured:Boolean(openaiKey),copilotModel:openaiKey?'gpt-6-luna':''});
-    if(request.method==='GET'&&pathname==='/api/workspace'&&loadWorkspace){
+    if(request.method==='GET'&&pathname==='/api/workspace'&&master&&loadWorkspace){
       try{return respond(200,workspaceFromParts(await loadWorkspace()));}
       catch{return respond(503,{error:'Workspace is unavailable.'});}
     }
