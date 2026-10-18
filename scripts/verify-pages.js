@@ -14,10 +14,9 @@ async function verifyPages({url='https://louiscxcix.github.io/lspm/',attempts=12
    if(await page.locator('#cloudSignIn').count())throw Error('Public viewing unexpectedly requires login.');
    const pending=await page.evaluate(()=>workspace.projects.find(p=>p.viewPending)?.id||'');
    if(pending){
-    await page.locator('a[href="#/projects/'+pending+'"]').click();
-    await page.locator('dialog input[type=password]').fill('7777777');
-    await page.locator('dialog [type=submit]').click();
-    await page.waitForFunction(id=>(workspace.projects.find(p=>p.id===id)?.entities.length||0)>0,pending,{timeout:20000});
+    await page.locator('#projectGate input[name=password]').fill('7777777');
+    await page.locator('#projectGate [type=submit]').click();
+    await page.waitForFunction(()=>document.body.dataset.access==='owner'&&workspace.projects.some(p=>(p.entities||[]).length>0),null,{timeout:20000});
    }else{
     await page.waitForFunction(()=>workspace.library.entities.length>0,null,{timeout:20000});
    }
@@ -27,6 +26,7 @@ async function verifyPages({url='https://louiscxcix.github.io/lspm/',attempts=12
     await page.locator('#projectTitle').filter({hasText:'Global Library'}).waitFor({state:'visible'});
     await page.waitForFunction(()=>document.querySelectorAll('#nodeLayer .node').length>0||document.querySelector('#nodeLayer').children.length>0);
    }else{
+    await page.locator('.project-card a').first().click();
     await page.locator('#projectTitle').waitFor({state:'visible'});
    }
    if(errors.length)throw Error('Published frontend raised '+errors.length+' browser errors.');

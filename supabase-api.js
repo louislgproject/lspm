@@ -11,7 +11,7 @@
   let session='';
   try{session=sessionStorage.getItem(key)||'';}catch{session='';}
   const panel=document.createElement('section');panel.className='cloud-auth';panel.setAttribute('aria-label','편집');
-  panel.innerHTML='<form id="cloudSignIn"><label>마스터 비밀번호<input name="password" type="password" autocomplete="current-password" required></label><button class="button primary" type="submit">열기</button><p class="muted">이 비밀번호만 모든 프로젝트를 편집합니다.</p></form><div id="cloudSignedIn" hidden><button class="button" id="cloudSignOut" type="button">닫기</button></div><p id="cloudAuthMessage" role="status"></p>';
+  panel.innerHTML='<form id="cloudSignIn"><label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label><button class="button primary" type="submit">열기</button></form><div id="cloudSignedIn" hidden><button class="button" id="cloudSignOut" type="button">닫기</button></div><p id="cloudAuthMessage" role="status"></p>';
   document.querySelector('.app-header').after(panel);
   const form=panel.querySelector('form'),message=panel.querySelector('#cloudAuthMessage');
   const render=()=>{root.EDIT_LOCKED=!session;document.body.dataset.access=session?'owner':'anonymous';form.hidden=Boolean(session);panel.querySelector('#cloudSignedIn').hidden=!session;};

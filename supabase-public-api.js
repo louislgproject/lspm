@@ -17,6 +17,16 @@
   Object.assign(api,{
     projectOpen:async()=>{throw Error('PROJECT_PASSWORD_REQUIRED');},
     projectLogin:async(projectId,password)=>{const result=await request('unlock',{projectId,password});tokens[projectId]=result.token;sessionStorage.setItem(tokenKey,JSON.stringify(tokens));return request('workspace');},
+    enter:async password=>{
+      const master=await fetch(base.origin+'/functions/v1/ontology/api/health',{headers:{apikey:config.publishableKey,'x-edit-password':password}});
+      if(master.ok){sessionStorage.setItem('pm-edit:'+base.hostname,password);const next=new URL(location.href);next.searchParams.set('edit','1');location.replace(next);return 'edit';}
+      const current=await request('workspace'),pending=(current.projects||[]).filter(project=>project.viewPending);
+      if(!pending.length)throw Error('비밀번호가 다릅니다.');
+      let opened=false;
+      for(const project of pending){try{const result=await request('unlock',{projectId:project.id,password});tokens[project.id]=result.token;opened=true;}catch(error){if(!opened)throw error;break;}}
+      sessionStorage.setItem(tokenKey,JSON.stringify(tokens));
+      return request('workspace');
+    },
     load:()=>request('workspace'),health:()=>request('health'),
     mapAssistant:input=>request('map-assistant',input),
     settings:async(_project,_view,data)=>data,
@@ -30,7 +40,6 @@
     exportBackup:readOnly
   });
   root.LocalAPI=api;
-  const edit=document.createElement('a');edit.className='button';edit.textContent='나만 보기 · 편집';edit.href='?edit=1'+location.hash;edit.onclick=()=>{edit.href='?edit=1'+location.hash;};document.querySelector('.header-actions').append(edit);
   const style=document.createElement('style');
   style.textContent='#projectFeatures,.project-access-settings,[data-final-part],[data-hourly-input],[data-hourly-unit-time],[data-progress-add],[data-progress-model],.wip-import,#wipSave,#wipPreviewResult,#productionLogsView,[data-production-view="Process logs"],#projectForm,#addFromLibrary,#renameProject,#archiveProject,#openDailyInput,#lensAddUpdate,#savedChangeReview,#recordsAdd,#productionConnect,#addEntityButton,#addRelationButton,#editEntity,#removeFromProject,#addProductionExcel,#addProductionLogs,#exportButton,#previewLogs,#saveLogs,#staffingForm,#productionStaffingForm,[data-tab="Input"],[data-tab="History"]{display:none!important}';
   document.head.appendChild(style);
