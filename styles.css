@@ -738,14 +738,15 @@ body:not([data-access="owner"]) .project-access-settings {display:none!important
 .project-type-cards { display: grid; grid-template-columns: repeat(auto-fit,minmax(min(100%,280px),1fr)); gap: 16px; }
 .sample-risk-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
 .sample-risk-tabs [aria-pressed="true"] { border-color: #1261d8; color: #1261d8; }
-.map-resize-bar { height:16px; cursor:ns-resize; touch-action:none; background:#d5e0e6; position:relative; z-index:6; flex:0 0 auto; }
-.map-resize-bar::before { content:''; position:absolute; left:50%; top:50%; width:42px; height:4px; transform:translate(-50%,-50%); border-radius:2px; background:#6e8796; }
+.map-resize-bar { height:20px; margin:0; cursor:ns-resize; touch-action:none; user-select:none; background:#d5e0e6; position:relative; z-index:6; flex:0 0 20px; }
+.map-resize-bar::before { content:''; position:absolute; left:50%; top:50%; width:56px; height:4px; transform:translate(-50%,-50%); border-radius:2px; background:#6e8796; }
 .map-resize-bar:hover,.map-resize-bar:active { background:#1261d8; }
-.map-stage.map-user-height,.production-map-stage.map-user-height { height:var(--map-h) !important; min-height:280px; max-height:none; width:auto !important; flex:1 1 auto !important; }
-.overview:has(.map-user-height) { height:auto; overflow:visible; }
-.map-panel:has(.map-user-height) { height:auto; }
-.map-panel:has(.map-user-height) .event-history-layout { height:auto; min-height:0; }
+.map-resize-bar:active::before { background:#fff; }
+.overview:has(.map-resize-bar) { height:auto; overflow:visible; }
+.map-panel:has(.map-resize-bar) { display:flex; flex-direction:column; height:auto; min-height:0; }
+.event-history-layout > .map-stage { align-self:flex-start; height:var(--map-h,min(68vh,760px)); }
+#productionMapStage { height:var(--map-h,min(68vh,760px)); min-height:240px; max-height:none; }
 .map-fullscreen .map-resize-bar { display:none; }
-.map-fullscreen .map-stage.map-user-height { height:auto !important; flex:1 1 auto !important; }
+.map-fullscreen .event-history-layout > .map-stage,.map-fullscreen #productionMapStage { height:auto; align-self:stretch; flex:1 1 auto; min-height:0; }
 
 body.production-progress-active :is(.map-part-actions,.part-model-group>summary input,.part-model-group>summary button) {display:none;}

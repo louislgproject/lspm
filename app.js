@@ -423,20 +423,20 @@ function placeMapResize(stage){
   let handle=anchor.parentElement.querySelector(':scope > .map-resize-bar');
   if(!handle){
     handle=document.createElement('div');handle.className='map-resize-bar';handle.tabIndex=0;handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','horizontal');handle.setAttribute('aria-label','프로세스 맵 크기');
-    const apply=height=>{const next=Math.round(Math.max(280,Math.min(window.innerHeight*1.8,height)));stage.style.setProperty('--map-h',next+'px');stage.classList.add('map-user-height');localStorage.setItem('pm-map-height:'+stage.id,String(next));};
+    const apply=height=>{const next=Math.round(Math.max(240,Math.min(window.innerHeight*1.8,height)));stage.style.setProperty('--map-h',next+'px');handle.setAttribute('aria-valuenow',String(next));return next;};
     handle.onpointerdown=event=>{
       if(event.button!==0)return;event.preventDefault();
       const startY=event.clientY,startH=stage.getBoundingClientRect().height;
-      handle.setPointerCapture(event.pointerId);
-      const move=ev=>apply(startH+ev.clientY-startY);
-      const end=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',end);handle.removeEventListener('pointercancel',end);};
+      handle.setPointerCapture(event.pointerId);let last=startH;
+      const move=ev=>{last=apply(startH+ev.clientY-startY);};
+      const end=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',end);handle.removeEventListener('pointercancel',end);localStorage.setItem('pm-map-height:'+stage.id,String(Math.round(last)));};
       handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);
     };
-    handle.onkeydown=event=>{if(event.key!=='ArrowUp'&&event.key!=='ArrowDown')return;event.preventDefault();apply(stage.getBoundingClientRect().height+(event.key==='ArrowDown'?48:-48));};
+    handle.onkeydown=event=>{if(event.key!=='ArrowUp'&&event.key!=='ArrowDown')return;event.preventDefault();const next=apply(stage.getBoundingClientRect().height+(event.key==='ArrowDown'?48:-48));localStorage.setItem('pm-map-height:'+stage.id,String(next));};
   }
-  anchor.after(handle);
+  anchor.before(handle);
   const saved=Number(localStorage.getItem('pm-map-height:'+stage.id));
-  if(saved>=280){stage.style.setProperty('--map-h',saved+'px');stage.classList.add('map-user-height');}
+  if(saved>=240)stage.style.setProperty('--map-h',saved+'px');
 }
 function renderProjectEntry() {
   const workstreams=store.workstreams||{};
