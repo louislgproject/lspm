@@ -29,7 +29,13 @@ async function publish({fetchImpl=fetch,configFile=configPath,stateFile=cachePat
   const config=JSON.parse(fs.readFileSync(configFile)),base='https://ahzpuefosoajwwgbfhng.supabase.co/rest/v1/rpc/';
   async function rpc(name,input){
     const r=await fetchImpl(base+name,{method:'POST',headers:{apikey:config.publishableKey,'Content-Type':'application/json'},body:JSON.stringify({p_token:config.token,...input}),signal:AbortSignal.timeout(60000)});
-    if(!r.ok)throw Error('SUPABASE_PUBLISH_FAILED_'+r.status);return r.json();
+    if(!r.ok){
+      const error=Error('SUPABASE_PUBLISH_FAILED_'+r.status);let detail;try{detail=await r.json();}catch{}
+      // Only known PostgreSQL transaction rollbacks can retire an operation key.
+      error.definitive=[400,409,422].includes(r.status)&&/^(22|23)[A-Z0-9]{3}$/.test(detail?.code||'');
+      if(detail?.code==='P0001'&&/^(INVALID_PUBLISH_BATCH|INVALID_REQUEST_KEY|INVALID_PUBLISH_RECORD|SOURCE_ID_MISMATCH|ENTITY_ID_MISMATCH|INVALID_ENTITY_RECORD|RELATION_ID_MISMATCH|PUBLISH_TABLE_NOT_ALLOWED)$/.test(detail.message||''))error.definitive=true;
+      throw error;
+    }return r.json();
   }
   if(statusOnly)return rpc('pm_history_sync_status',{});
   const cache=fs.existsSync(stateFile)?JSON.parse(fs.readFileSync(stateFile)):{};
@@ -45,7 +51,15 @@ async function publish({fetchImpl=fetch,configFile=configPath,stateFile=cachePat
   cache.records||={};let changed=0,conflicts=0,revision;let batch=[];
   function saveState(){const temp=stateFile+'.pending';fs.writeFileSync(temp,JSON.stringify(cache),{mode:0o600});fs.renameSync(temp,stateFile);}
   async function sendPending(){
-    const pending=cache.pendingBatch,result=await rpc('pm_ingest_local_history',{p_batch:{key:pending.requestKey,changes:pending.changes}}),accepted=new Set(result.accepted.map(x=>x.table+':'+x.id)),rejected=new Set(result.conflicts.map(x=>x.table+':'+x.id));
+    const pending=cache.pendingBatch;let result;
+    try{result=await rpc('pm_ingest_local_history',{p_batch:{key:pending.requestKey,changes:pending.changes}});}catch(error){
+      if(error.definitive){
+        const file=stateFile+'.rejected-'+pending.requestKey+'.json';
+        fs.writeFileSync(file,JSON.stringify(pending),{mode:0o600});
+        cache.lastRejectedBatch={file,rejectedAt:new Date().toISOString()};delete cache.pendingBatch;saveState();
+      }throw error;
+    }
+    const accepted=new Set(result.accepted.map(x=>x.table+':'+x.id)),rejected=new Set(result.conflicts.map(x=>x.table+':'+x.id));
     if(pending.items.some(x=>!accepted.has(x.key)&&!rejected.has(x.key)))throw Error('PUBLISH_ACK_INCOMPLETE');
     for(const item of pending.items)if(accepted.has(item.key))cache.records[item.key]={hash:item.fingerprint,...(item.table==='entities'?{row:item.row}:{})};
     changed+=result.changed;conflicts+=result.conflicts.length;revision=result.revision;cache.lastConfirmedAt=new Date().toISOString();cache.remoteRevision=revision;cache.pendingConflicts=conflicts;delete cache.pendingBatch;saveState();

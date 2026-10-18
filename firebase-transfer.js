@@ -10,7 +10,7 @@ function redact(value){
   if(Array.isArray(value))return value.map(redact);
   if(value&&typeof value==='object')return Object.fromEntries(Object.entries(value).map(([key,item])=>[key,/^(?:cdrToken|access_token|refresh_token|password|passwordHash|client_secret|private_key|service_role_key|api_key)$/i.test(key)?(item&&typeof item==='object'&&'stringValue'in item?{stringValue:'[REDACTED]'}:'[REDACTED]'):redact(item)]));
   if(typeof value==='string'&&/^[\s]*[\[{]/.test(value)){
-    try{const json=JSON.parse(value),clean=redact(json);return JSON.stringify(json)===JSON.stringify(clean)?value:JSON.stringify(clean);}catch{}
+    try{const bom=value.startsWith('\uFEFF')?'\uFEFF':'',json=JSON.parse(value.slice(bom.length)),clean=redact(json);return JSON.stringify(json)===JSON.stringify(clean)?value:bom+JSON.stringify(clean);}catch{}
   }
   return value;
 }

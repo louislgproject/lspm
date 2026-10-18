@@ -10,6 +10,8 @@ The local capability in `../.local-data/supabase-publisher.json` is owner-bound,
 
 Publication reads one consistent SQLite snapshot and validates the graph. A fresh operation key is saved locally before network I/O; only an uncertain retry of that operation reuses it. Repeating an earlier value later is a new operation. Only acknowledged rows advance the confirmed checkpoint. Source collection checkpoints and remote publication checkpoints remain independent.
 
+A definite PostgreSQL validation or constraint rollback is retained in a private rejected-batch file without advancing checkpoints. Corrected input gets a new operation. Network failures and uncertain responses retain the exact pending operation for safe replay. Incomplete object identity, type, name or status is rejected server-side before updates.
+
 Source bytes are preserved, including binary files and text byte-order marks. Declared credential redactions carry original and published content hashes plus the original metadata hash. A differing source never replaces the existing source: its full incoming version is retained in administrator-only `pm.publisher_source_versions`, and conflicting business changes remain unacknowledged for review. Verified credential-redacted variants may be acknowledged without discarding the existing original. Oversized records stop explicitly for a dedicated attachment transfer.
 
 An unchanged second publication still checks the remote connection. Failures and conflicts must not be reported as completed. The Mac, Codex, and local Kakao database must remain available; sleep is not continuous server operation.

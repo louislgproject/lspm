@@ -11,6 +11,7 @@ test('redacts credentials nested inside retained JSON without changing business 
   assert.equal(JSON.parse(output.fields.payload.stringValue).text,'Machine authorization is pending');
   assert.equal(JSON.parse(output.fields.payload.stringValue).rows[0].quantity,42);
   assert.equal(JSON.parse(input.fields.payload.stringValue).cdrToken,'call-secret');
+  assert.equal(transfer.redact('\uFEFF'+JSON.stringify({cdrToken:'bom-secret'})),'\uFEFF'+JSON.stringify({cdrToken:'[REDACTED]'}));
 });
 
 test('Firestore values preserve timestamps and exact large integer IDs',()=>{
@@ -57,14 +58,19 @@ test('PostgreSQL merge preserves edits, is idempotent, and rejects stale revisio
     await db.query('CREATE TABLE pm.entities(owner_id UUID,id TEXT,type TEXT,data_json TEXT,PRIMARY KEY(owner_id,id));CREATE TABLE pm.sources(owner_id UUID,id TEXT,kind TEXT,filename TEXT,mime_type TEXT,content BYTEA,created_at TEXT,metadata_json TEXT,PRIMARY KEY(owner_id,id));CREATE TABLE pm.relations(owner_id UUID,id TEXT,type TEXT,from_id TEXT,to_id TEXT,scope_project_id TEXT,data_json TEXT,PRIMARY KEY(owner_id,id));CREATE TABLE pm.project_memberships(owner_id UUID,project_id TEXT,entity_id TEXT,PRIMARY KEY(owner_id,project_id,entity_id))');
     await db.query(fs.readFileSync(require('node:path').join(__dirname,'supabase/migrations/202610170006_history_publisher.sql'),'utf8'));
     await db.query(fs.readFileSync(require('node:path').join(__dirname,'supabase/migrations/202610170007_publisher_integrity.sql'),'utf8'));
+    await db.query(fs.readFileSync(require('node:path').join(__dirname,'supabase/migrations/202610170008_publisher_validation.sql'),'utf8'));
     const token='fixture-only-'.padEnd(64,'x'),tokenHash=require('node:crypto').createHash('sha256').update(token).digest('hex');
     await db.query("INSERT INTO pm.publisher_devices(token_hash,owner_id,name) VALUES($1,$2,'test')",[tokenHash,owner]);
     await assert.rejects(db.query('SELECT public.pm_history_sync_status($1)',['wrong']),/PUBLISHER_AUTH_REQUIRED/);
-    const row={id:'contact',type:'Person',data_json:JSON.stringify({id:'contact',type:'Person',name:'Confirmed contact'})};
+    const row={id:'contact',type:'Person',data_json:JSON.stringify({id:'contact',type:'Person',name:'Confirmed contact',status:'active'})};
     const batch={key:'c'.repeat(64),changes:[{table:'entities',id:'contact',row}]};
     const result=(await db.query('SELECT public.pm_ingest_local_history($1,$2) value',[token,batch])).rows[0].value;assert.equal(result.changed,1);assert.equal(result.revision,340);
     assert.deepEqual((await db.query('SELECT public.pm_ingest_local_history($1,$2) value',[token,batch])).rows[0].value,result);
-    const conflict={key:'d'.repeat(64),changes:[{table:'entities',id:'contact',row:{...row,data_json:JSON.stringify({id:'contact',type:'Person',name:'Unconfirmed overwrite'})}}]};
+    for(const invalid of [{},{id:'contact',type:'Person',name:'Missing status'},{id:'contact',type:'Person',name:12,status:'active'}]){
+      await assert.rejects(db.query('SELECT public.pm_ingest_local_history($1,$2)',[token,{key:'2'.repeat(64),changes:[{table:'entities',id:'contact',row:{...row,data_json:JSON.stringify(invalid)},before:row}]}]),/INVALID_ENTITY_RECORD/);
+    }
+    await assert.rejects(db.query('SELECT public.pm_ingest_local_history($1,$2)',[token,{key:'2'.repeat(64)}]),/INVALID_PUBLISH_BATCH/);
+    const conflict={key:'d'.repeat(64),changes:[{table:'entities',id:'contact',row:{...row,data_json:JSON.stringify({id:'contact',type:'Person',name:'Unconfirmed overwrite',status:'active'})}}]};
     assert.equal((await db.query('SELECT public.pm_ingest_local_history($1,$2) value',[token,conflict])).rows[0].value.conflicts.length,1);
     assert.equal(JSON.parse((await db.query("SELECT data_json FROM pm.entities WHERE id='contact'")).rows[0].data_json).name,'Confirmed contact');
     const part={id:'part',type:'Part',name:'Existing production part',status:'active'};

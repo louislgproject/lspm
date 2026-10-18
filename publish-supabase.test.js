@@ -38,6 +38,12 @@ test('an uncertain request reuses its persisted operation key on retry',async()=
  const fetchImpl=async(url,request)=>{if(url.endsWith('pm_history_sync_status'))return{ok:true,json:async()=>({revision:1})};const b=JSON.parse(request.body).p_batch;keys.push(b.key);if(!replies.has(b.key))replies.set(b.key,{revision:1,changed:1,accepted:b.changes.map(c=>({table:c.table,id:c.id})),conflicts:[]});if(loseReply){loseReply=false;throw Error('Connection lost after commit');}return{ok:true,json:async()=>replies.get(b.key)};};
  await assert.rejects(publish({configFile,stateFile,dbFile:f.file,fetchImpl}),/Connection lost/);await publish({configFile,stateFile,dbFile:f.file,fetchImpl});assert.equal(keys[0],keys[1]);assert.equal(replies.size,1);assert.equal(JSON.parse(fs.readFileSync(stateFile)).pendingBatch,undefined);
 });
+test('a definite transaction rejection is quarantined and does not block corrected input',async()=>{
+ const f=fixture();f.db.close();const configFile=path.join(f.dir,'config.json'),stateFile=path.join(f.dir,'state.json');fs.writeFileSync(configFile,JSON.stringify({token:'private-token',publishableKey:'public'}));let rejected=true;const keys=[];
+ const fetchImpl=async(_url,request)=>{const b=JSON.parse(request.body).p_batch;keys.push(b.key);if(rejected){rejected=false;return{ok:false,status:400,json:async()=>({code:'22P02',message:'Invalid JSON input'})};}return{ok:true,json:async()=>({revision:1,changed:1,accepted:b.changes.map(c=>({table:c.table,id:c.id})),conflicts:[]})};};
+ await assert.rejects(publish({configFile,stateFile,dbFile:f.file,fetchImpl}),/SUPABASE_PUBLISH_FAILED_400/);const first=JSON.parse(fs.readFileSync(stateFile));assert.equal(first.pendingBatch,undefined);assert.equal(fs.existsSync(first.lastRejectedBatch.file),true);assert.deepEqual(first.records,{});
+ const d=new DatabaseSync(f.file);d.prepare('UPDATE sources SET metadata_json=?').run('{"corrected":true}');d.close();await publish({configFile,stateFile,dbFile:f.file,fetchImpl});assert.notEqual(keys[0],keys[1]);
+});
 test('invalid ontology never reaches the remote publisher',async()=>{
  const f=fixture();f.db.prepare('UPDATE entities SET data_json=?').run(JSON.stringify({id:'person',type:'Person',name:'Broken person'}));f.db.close();
  const configFile=path.join(f.dir,'config.json'),stateFile=path.join(f.dir,'state.json');fs.writeFileSync(configFile,JSON.stringify({token:'private-token',publishableKey:'public'}));let called=false;
