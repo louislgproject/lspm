@@ -1795,7 +1795,7 @@ $('#archiveProject').onclick=async ()=>{
 window.addEventListener('hashchange',route);
 function mapAssistantScope(){
   if(basicAccess||!store||!['Overview','Production'].includes(activeTab)||activeTab==='Production'&&productionMode!=='Process map')return null;
-  return {scopeId:store.id,visibleIds:null,configured:mapAssistantConfigured,key:store.id,title:(store.id==='library'?'전체 온톨로지':store.name+' · 프로젝트 온톨로지 전체')};
+  return {scopeId:store.id,visibleIds:null,configured:mapAssistantConfigured,key:store.id,title:''};
 }
 function focusMapSelection(kind,idSet){
   const production=kind==='production',stage=$(production?'#productionMapStage':'#mapStage'),layer=$(production?'#productionNodes':'#nodeLayer');
@@ -1878,4 +1878,15 @@ function openLinkedObject(id){
   else toast('프로세스 맵에서 이 객체의 기록된 위치를 찾지 못했습니다.');
 }
 const mapAssistantUI=new window.MapAssistantView({getScope:mapAssistantScope,ask:input=>LocalAPI.mapAssistant(input),highlight:openLinkedObject});
+function bindMapSize(stage,controls){
+  if(!stage||!controls||controls.querySelector('.map-size'))return;
+  const label=document.createElement('label');label.className='map-size';label.innerHTML='크기<input type="range" min="480" max="2000" step="20" aria-label="지도 크기">';
+  const input=label.querySelector('input');
+  const apply=value=>{const height=Math.min(2000,Math.max(480,Number(value)||720));document.querySelectorAll('.map-stage').forEach(node=>{node.style.height=height+'px';node.style.maxHeight='none';node.style.flex='none';});document.querySelectorAll('.map-size input').forEach(node=>{node.value=String(height);});localStorage.setItem('pm-map-height',String(height));};
+  input.oninput=()=>apply(input.value);
+  controls.append(label);
+  apply(localStorage.getItem('pm-map-height')||Math.round(window.innerHeight*.78));
+}
+bindMapSize($('#mapStage'),document.querySelector('.map-controls .zoom-controls'));
+bindMapSize($('#productionMapStage'),document.querySelector('#productionView .zoom-controls'));
 setInputMode(inputMode); route(); startLocal();
