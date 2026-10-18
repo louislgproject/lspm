@@ -163,8 +163,10 @@ function partRows(project,network,{showMachines=true,showComponents=true,collaps
   for(const n of original){const items=context.satellites.filter(s=>s.stepId===n.id),p=rowPositions.get(n.id);for(const direction of ['input','output'])items.filter(s=>s.direction===direction).forEach((s,i)=>satellites.push({...s,stepId:'part-view:'+part.id+':'+n.id,partIds,x:p.x,y:mainIds.has(n.id)?direction==='input'?y+64+i*59:mainY+88+i*59:p.y+80+items.indexOf(s)*59}));}
   const rowSatellites=satellites.filter(s=>s.partIds.includes(part.id)),rowWidth=Math.max(320,...original.map(n=>rowPositions.get(n.id).x+226));
   const rowBottom=Math.max(sideY,...rowSatellites.map(s=>s.y+76));
-  const modelNames=[...new Set(members.map(p=>partsModel.model(project,p).name))];
-  frames.push({name:members.length>1?modelNames.join(' / ')+' · '+members.length+' 세부 파츠':part.name,kind:'Model',partIds,x:16,y,width:rowWidth+16,height:rowBottom-y,static:true});width=Math.max(width,rowWidth+48);y=rowBottom+48;
+  const bases=[...new Set(members.map(p=>partsModel.model(project,p).name))];
+  const full=partsModel.label(part),rest=bases.length===1&&full.toLowerCase().startsWith(bases[0].toLowerCase())?full.slice(bases[0].length).trim():'';
+  const frameName=members.length>1?bases.join(' / ')+' · '+members.length+' 세부 파츠':rest?bases[0]+' · '+rest:full;
+  frames.push({name:frameName,kind:'Model',partIds,x:16,y,width:rowWidth+16,height:rowBottom-y,static:true});width=Math.max(width,rowWidth+48);y=rowBottom+48;
  }
  const materialIds=new Set(satellites.map(s=>s.entity.id));
  for(const s of satellites)if(!positions[s.entity.id])positions[s.entity.id]={x:s.x,y:s.y};
