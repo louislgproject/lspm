@@ -6,7 +6,7 @@
     "start": "node server.js",
     "build:cloud": "node build-cloud.js",
     "build:supabase": "node scripts/build-supabase.js",
-    "test": "node --test local-store.test.js server.test.js wip.test.js components.test.js production-logs.test.js highlight.test.js import-ls-observations.test.js cloud-handler.test.js supabase-api.test.js postgres-store.test.js supabase-management.test.js supabase-release.test.js supabase-public.test.js backup-recovery.test.js backup-restore.test.js hourly.test.js hourly-model.test.js sample-preparation.test.js map-readability.test.js publication-safety.test.js firebase-transfer.test.js publish-supabase.test.js workspace-auth.test.js people-context.test.js stage-batches.test.js map-assistant.test.js",
+    "test": "node --test local-store.test.js server.test.js wip.test.js components.test.js production-logs.test.js highlight.test.js import-ls-observations.test.js cloud-handler.test.js supabase-api.test.js postgres-store.test.js supabase-management.test.js supabase-release.test.js supabase-public.test.js backup-recovery.test.js backup-restore.test.js hourly.test.js hourly-model.test.js sample-preparation.test.js map-readability.test.js publication-safety.test.js firebase-transfer.test.js publish-supabase.test.js workspace-auth.test.js people-context.test.js stage-batches.test.js map-assistant.test.js project-access.test.js final-parts.test.js",
     "deploy:supabase": "npm run build:supabase && node scripts/deploy-supabase.js",
     "verify:supabase": "node scripts/verify-supabase.js",
     "check:publication": "node scripts/check-publication-safety.js"

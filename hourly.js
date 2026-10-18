@@ -1,10 +1,10 @@
 (function(root){
- const M=typeof module==='object'?require('./ontology-model'):root.OntologyModel,G=typeof module==='object'?require('./progress'):root.ProductionProgress;
+ const M=typeof module==='object'?require('./ontology-model'):root.OntologyModel,G=typeof module==='object'?require('./progress'):root.ProductionProgress,F=typeof module==='object'?require('./final-parts'):root.FinalParts;
  const day=v=>new Intl.DateTimeFormat('en-CA',{timeZone:'America/Mexico_City',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(v));
  const productionDay=v=>day(new Date(Date.parse(v)-7*3600000));
  const daySlots=date=>Array.from({length:24},(_,i)=>{const start=Date.parse(date+'T07:00:00-06:00')+i*3600000;return {start:new Date(start).toISOString(),end:new Date(start+3600000).toISOString()};});
  function capacity(seconds,duration=3600){if(seconds==null)return null;if(typeof seconds!=='number'||!Number.isFinite(seconds)||seconds<0.001||seconds>86400||!Number.isFinite(duration)||duration<=0||duration>3600)throw Error('Unit Time은 0.001~86400초/PCB로 입력하세요.');return {uph:3600/seconds,target:Math.floor(duration/seconds*0.85),margin:0.15};}
- function rate(project,input){if(!project||project.status==='archived'||!isProductionModel(M.byId(project,input.partId)))throw Error('프로젝트의 모델을 확인하세요.');if(input.unitTimeSeconds==null)throw Error('Unit Time을 입력하세요.');capacity(input.unitTimeSeconds);if(typeof input.effectiveDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(input.effectiveDate)||day(input.effectiveDate+'T12:00:00-06:00')!==input.effectiveDate)throw Error('적용 생산일을 확인하세요.');return {partId:input.partId,unitTimeSeconds:input.unitTimeSeconds,effectiveDate:input.effectiveDate,margin:0.15};}
+ function rate(project,input){if(!project||project.status==='archived'||!isProductionModel(M.byId(project,input.partId)))throw Error('프로젝트의 모델을 확인하세요.');if(M.isProductPart(M.byId(project,input.partId))&&!F.isFinal(project,M.byId(project,input.partId)))throw Error('IB/OB·RH/LH를 구분한 최종 파츠를 선택하세요.');if(input.unitTimeSeconds==null)throw Error('Unit Time을 입력하세요.');capacity(input.unitTimeSeconds);if(typeof input.effectiveDate!=='string'||!/^\d{4}-\d{2}-\d{2}$/.test(input.effectiveDate)||day(input.effectiveDate+'T12:00:00-06:00')!==input.effectiveDate)throw Error('적용 생산일을 확인하세요.');return {partId:input.partId,unitTimeSeconds:input.unitTimeSeconds,effectiveDate:input.effectiveDate,margin:0.15};}
  function rateFor(rates,partId,date){return (rates||[]).filter(r=>r.partId===partId&&r.effectiveDate<=date).sort((a,b)=>a.effectiveDate.localeCompare(b.effectiveDate)||(a.recordRevision||0)-(b.recordRevision||0)||(a.recordedAt||'').localeCompare(b.recordedAt||'')).at(-1)||null;}
  const isModel=r=>r.measurementKind==='model';
  const isProductionModel=e=>M.isProductPart(e)||M.isComponentPart(e);
@@ -55,6 +55,7 @@
   const model=row.measurementKind==='model'||!row.stepId;
   if(row.measurementKind!=null&&row.measurementKind!=='model')throw Error('측정 기준을 확인하세요.');
   const part=M.byId(project,row.partId);if(!(model?isProductionModel(part):M.isProductPart(part)))throw Error('프로젝트의 모델을 확인하세요.');
+  if(M.isProductPart(part)&&!F.isFinal(project,part))throw Error('IB/OB·RH/LH를 구분한 최종 파츠를 선택하세요. 기존 상위 모델 기록은 그대로 보존됩니다.');
   if(model&&(row.stepId||row.machineId))throw Error('모델 생산량에는 공정·설비별 수량을 넣을 수 없습니다.');
   if(!model&&!G.steps(project,row.partId).some(s=>s.id===row.stepId))throw Error('프로젝트의 Part와 공정을 확인하세요.');
   const start=new Date(G.timestamp(row.start)).toISOString(),end=new Date(G.timestamp(row.end)).toISOString();if(Date.parse(end)<=Date.parse(start)||Date.parse(end)-Date.parse(start)>3600000||day(start)!==day(new Date(Date.parse(end)-1).toISOString()))throw Error('같은 날짜의 1시간 이하 구간을 선택하세요.');

@@ -71,7 +71,7 @@ function createStore(db) {
   }
   function* load() {
     const revision = Number((yield db.prepare("SELECT value FROM meta WHERE key='revision'").get()).value);
-    const entities = (yield* read('SELECT data_json FROM entities ORDER BY rowid')).map((row) => JSON.parse(row.data_json));
+    const entities = (yield* read('SELECT data_json FROM entities ORDER BY rowid')).map((row) => {const e=JSON.parse(row.data_json);if(e.type==='Event'){e.status||='active';if(e.sourceId||e.id.startsWith('cloud-event-'))delete e.rawLog;}return e;});
     const relations = (yield* read('SELECT data_json,scope_project_id FROM relations ORDER BY rowid')).map((row) => ({ ...JSON.parse(row.data_json), scopeProjectId: row.scope_project_id }));
     const changes = (yield* read('SELECT project_id,data_json FROM entity_changes ORDER BY rowid')).map((row) => ({ scope: row.project_id, change: JSON.parse(row.data_json) }));
     const library = { id: 'library', name: 'Global Library', status: 'active', version: 2, entities: entities.map((e) => ({ ...e, projectId: 'library' })), relations: relations.map((r) => ({ ...r, projectId: 'library' })), changes: changes.filter((c) => !c.scope).map((c) => c.change) };

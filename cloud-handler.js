@@ -16,7 +16,7 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
     const headers=new Headers({'Content-Type':'application/json','Cache-Control':'no-store','Vary':'Origin'});
     const respond=(status,value)=>new Response(JSON.stringify(value),{status,headers});
     if(origin&&!origins.has(origin))return respond(403,{error:'Origin not allowed.'});
-    if(origin){headers.set('Access-Control-Allow-Origin',origin);headers.set('Access-Control-Allow-Headers','authorization,apikey,content-type,x-client-info');headers.set('Access-Control-Allow-Methods','GET,POST,PUT,OPTIONS');}
+    if(origin){headers.set('Access-Control-Allow-Origin',origin);headers.set('Access-Control-Allow-Headers','authorization,apikey,content-type,x-client-info,x-project-access');headers.set('Access-Control-Allow-Methods','GET,POST,PUT,OPTIONS');}
     if(request.method==='OPTIONS')return new Response(null,{status:204,headers});
     const url=new URL(request.url);
     // Supabase's gateway strips /functions/v1 before forwarding to the runtime.
@@ -24,6 +24,12 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
     const pathname=url.pathname.replace(/^\/(?:functions\/v1\/)?ontology(?=\/|$)/,'');
     if(!pathname.startsWith('/api/'))return respond(404,{error:'Not found.'});
     if(pathname.startsWith('/api/public/')){
+      if(pathname==='/api/public/unlock'&&request.method==='POST'){
+        try{const input=JSON.parse((await bodyBytes(request)).toString());
+          if(typeof input.projectId!=='string'||typeof input.password!=='string'||input.password.length>72)return respond(400,{error:'Check the project and password.'});
+          return await withPublicStore(async store=>{const result=await store.unlock(input.projectId,input.password);return respond(result.error?403:200,result);});
+        }catch{return respond(400,{error:'Unable to unlock this project.'});}
+      }
       if(request.method!=='GET')return respond(405,{error:'Public workspace is read-only.'});
       if(!withPublicStore)return respond(503,{error:'Public workspace is not configured.'});
       const route=pathname.slice('/api/public/'.length);
@@ -50,7 +56,7 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
         if(route==='hourly')return respond(200,(await store.listHourly(project)).map(({sourceId,...row})=>row));
         if(route==='sample-preparation')return respond(200,(await store.samplePreparationList(project)).map(require('./sample-preparation').sanitize));
         return respond(200,await store.listProductionStaffing(project));
-      });}catch(error){
+      },request.headers.get('x-project-access')||'');}catch(error){
         const candidate=String(error.code||'PUBLIC_READ_FAILED');
         const code=/^[A-Z0-9_]{1,64}$/.test(candidate)?candidate:'PUBLIC_READ_FAILED';
         return respond(503,{error:'Public workspace is unavailable.',code,stage:error.publicStage==='supabase-data-api'?'supabase-data-api':'public-read'});
@@ -65,6 +71,17 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
     try{bytes=await bodyBytes(request);}catch{return respond(413,{error:'Request exceeds 16 MB.'});}
     try{
       return await withStore(user.workspaceId||user.id,async (store,client)=>{
+        if(pathname==='/api/project-access'&&client){
+          try{
+            if(request.method==='GET')return respond(200,(await client.query('SELECT public.pm_get_project_access($1) AS value',[url.searchParams.get('project')||''])).rows[0].value);
+            if(request.method==='POST'){
+              const input=JSON.parse(bytes.toString());
+              if(!['public','password','private'].includes(input.visibility)||typeof input.password!=='string')return respond(400,{error:'Check visibility and password.'});
+              await client.query('SELECT public.pm_set_project_access($1,$2,$3)',[input.projectId,input.visibility,input.password]);
+              return respond(200,await store.load());
+            }
+          }catch{const error=Error('Invalid access settings.');error.response=respond(400,{error:'공개 범위와 비밀번호를 확인하세요. 새 비밀번호는 4자 이상, 최대 72바이트입니다.'});throw error;}
+        }
         if(pathname==='/api/import'&&request.method==='POST'){
           if(!request.headers.get('content-type')?.startsWith('application/json'))return respond(400,{error:'Use application/json.'});
           return respond(200,await importBackup(store,client,JSON.parse(bytes.toString())));

@@ -14,7 +14,7 @@
   panel.innerHTML='<form id="cloudSignIn"><strong>Sign in to your workspace</strong><p>For the migrated workspace, create an account with the original owner email and verify it first.</p><label>Email<input name="email" type="email" autocomplete="email" required></label><label>Password<input name="password" type="password" autocomplete="current-password" minlength="6" required></label><button class="button primary" type="submit">Sign in</button><button class="button" type="button" id="cloudSignUp">Create account</button></form><div id="cloudSignedIn" hidden><span id="cloudAccount"></span> <button class="button" id="cloudSignOut" type="button">Sign out</button></div><p id="cloudAuthMessage" role="status"></p>';
   document.querySelector('.app-header').after(panel);
   const form=panel.querySelector('form'),message=panel.querySelector('#cloudAuthMessage');
-  const render=()=>{form.hidden=Boolean(session);panel.querySelector('#cloudSignedIn').hidden=!session;panel.querySelector('#cloudAccount').textContent=session?.user?.email||'Signed in';};
+  const render=()=>{document.body.dataset.access=session?'owner':'anonymous';form.hidden=Boolean(session);panel.querySelector('#cloudSignedIn').hidden=!session;panel.querySelector('#cloudAccount').textContent=session?.user?.email||'Signed in';};
   const save=value=>{session=value;if(value)sessionStorage.setItem(key,JSON.stringify(value));else sessionStorage.removeItem(key);render();};
   async function auth(path,body,token){
     const response=await fetch(base.origin+'/auth/v1/'+path,{method:'POST',headers:{apikey:config.publishableKey,'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});
@@ -61,6 +61,8 @@
   };
   render();
   root.LocalAPI={
+    projectAccessGet:project=>request('project-access?'+new URLSearchParams({project})),
+    projectAccessSave:input=>request('project-access','POST',input),
     progressList:project=>request('progress?'+new URLSearchParams({project})),
     hourlyList:project=>request('hourly?'+new URLSearchParams({project})),
     samplePreparationList:project=>request('sample-preparation?'+new URLSearchParams({project})),

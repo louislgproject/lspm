@@ -24,5 +24,10 @@ test('migrated Progress detail retains its direct original source and readable s
  try{let w=d.load(),p=P.create('LS'),part=M.addEntity(p,{type:'Part',name:'Model',itemKind:'product'}),step=M.addEntity(p,{type:'Production Step',name:'Operation'});M.addRelation(p,{type:'applies_to',from:step.id,to:part.id});w.projects.push(p);w=d.save(w,null,w.revision);w=d.save({...w,projects:[p]},p.id,w.revision);
  const saved=d.saveProgress({projectId:p.id,revision:w.revision,text:'Original WIP observation',rows:[{partId:part.id,stepId:step.id,capturedAt:'2026-10-17T09:00:00-06:00',quantity:0,unit:'pcs'}]});
  const detail=d.historyDetail(saved.eventIds[0],p.id);a.equal(detail.sources[0].text,'Original WIP observation');a.ok(detail.links.some(l=>l.toName==='Model'));a.equal(d.listProgress(p.id).rows[0].quantity,0);
+ // Legacy uploads used an invalid Event shape; normalize it without losing the retained source.
+ const {DatabaseSync}=require('node:sqlite'),raw=new DatabaseSync(path.join(dir,'db.sqlite'));
+ try{const row=raw.prepare('SELECT data_json FROM entities WHERE id=?').get(saved.eventIds[0]),event=JSON.parse(row.data_json);delete event.status;event.rawLog='Original WIP observation';raw.prepare('UPDATE entities SET data_json=? WHERE id=?').run(JSON.stringify(event),event.id);}finally{raw.close();}
+ w=d.load();const next=structuredClone(w);require('./progress').registerModel(next.projects[0],{basePartId:part.id,name:'Model IB RH',inOut:'IB',side:'RH',finalPart:true});d.save(next,p.id,w.revision);
+ a.equal(d.historyDetail(saved.eventIds[0],p.id).sources[0].text,'Original WIP observation');a.equal(d.listProgress(p.id).rows[0].quantity,0);
  }finally{d.close();fs.rmSync(dir,{recursive:true,force:true});}
 });

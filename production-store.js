@@ -48,7 +48,7 @@ module.exports=function({db,load,read,snapshot,rowDiff,putSettings}){
   const existing=(yield* listProgress(p.id)).rows;
   for(const row of draft.rows){const previous=existing.filter(r=>r.partId===row.partId&&r.stepId===row.stepId&&r.unit===row.unit&&r.capturedAt===row.capturedAt).at(-1);if(previous&&previous.quantity!==row.quantity&&!input.confirmCorrections)throw Error('Confirm corrections to existing WIP observations.');}
   const result=yield* transaction(input,'Production Progress · WIP observations',function*(){
-   const sourceId='source-'+randomUUID(),event={...draft.event,rawLog:input.text};yield db.prepare('INSERT INTO sources(id,kind,filename,mime_type,content,created_at) VALUES (?,?,?,?,?,?)').run(sourceId,'text','Production Progress · WIP','text/plain',Buffer.from(input.text),uploaded);
+   const sourceId='source-'+randomUUID(),event={...draft.event};yield db.prepare('INSERT INTO sources(id,kind,filename,mime_type,content,created_at) VALUES (?,?,?,?,?,?)').run(sourceId,'text','Production Progress · WIP','text/plain',Buffer.from(input.text),uploaded);
    event.sourceId=sourceId;yield db.prepare('INSERT INTO entities(id,type,data_json) VALUES (?,?,?)').run(event.id,event.type,JSON.stringify(event));
    yield db.prepare('INSERT INTO project_memberships(project_id,entity_id) VALUES (?,?)').run(p.id,event.id);
    for(const link of draft.links)yield db.prepare('INSERT INTO relations(id,type,from_id,to_id,scope_project_id,data_json) VALUES (?,?,?,?,?,?)').run(link.id,link.type,link.from,link.to,p.id,JSON.stringify(link));

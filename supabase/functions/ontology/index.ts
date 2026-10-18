@@ -8,7 +8,7 @@ const allowedOrigins=(Deno.env.get('PM_ALLOWED_ORIGINS')||'https://louiscxcix.gi
 
 Deno.serve(createCloudHandler({
   allowedOrigins,
-  withPublicStore:(operation:Function)=>operation(createPublicDataStore({url,apiKey})),
+  withPublicStore:(operation:Function,viewTokens='')=>operation(createPublicDataStore({url,apiKey,viewTokens})),
   geminiKey:Deno.env.get('GEMINI_API_KEY')||'',
   authenticate:async (token:string)=>{
     const response=await fetch(url+'/auth/v1/user',{headers:{apikey:apiKey,Authorization:'Bearer '+token}});
