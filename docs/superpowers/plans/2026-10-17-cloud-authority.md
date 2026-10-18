@@ -26,25 +26,37 @@ Interfaces:
 - `pm_kakao_collect(p_token TEXT,p_messages JSONB)` accepts a <=100-element message array with chatId/logId/authorId/sender/senderNameCandidates/time/type/text/originalHash. Returns `{added,duplicates,checkpoints}`. Preserve old source IDs when matching existing sourceKey. Seed cursors and review dispositions from already stored approved Kakao source metadata; do not rely on local files.
 - `pm_kakao_review(p_token TEXT,p_review JSONB)` accepts `{key,items:[{sourceId,disposition,reason,eventIds}],changes:[existing publisher row changes]}`. Allowed dispositions: event, source_only, unresolved. Reuses `pm_ingest_local_history` for validated insertions but forbids changes to existing entities/relations and non-History tables. All Events must be local_only business Events, with allowed source-backed Evidence and active explicit scopes or unassigned scope. Require every event's evidence to come from reviewed source IDs. Review ledger and inserted rows commit atomically; identical reviews replay, different reviews of a recorded source are rejected. Existing unresolved dispositions remain queryable, not repeatedly imported.
 
-- [ ] Write PostgreSQL tests first. Create a disposable DB using fixture migrations, register a synthetic device, assert invalid token/room/source/identity rejection, repeat collection, original conflict rollback, monotonic cursors, atomic source-only review, source-backed Event review, review replay and forbidden Part update.
-- [ ] Implement the additive migration. Lock the pinned workspace revision for collections/reviews. Use existing publisher source identity/hash conventions. Original rows and cloud edits remain immutable.
-- [ ] Run `node --test kakao-cloud-db.test.js` with `TEST_DATABASE_URL` in GitHub CI; local execution may skip only the unavailable PostgreSQL instance. Report exact tests and remaining risks.
+- [x] Write PostgreSQL tests first. Create a disposable DB using fixture migrations, register a synthetic device, assert invalid token/room/source/identity rejection, repeat collection, original conflict rollback, monotonic cursors, atomic source-only review, source-backed Event review, review replay and forbidden Part update.
+- [x] Implement the additive migration. Lock the pinned workspace revision for collections/reviews. Use existing publisher source identity/hash conventions. Original rows and cloud edits remain immutable.
+- [x] Run `node --test kakao-cloud-db.test.js` with `TEST_DATABASE_URL` in GitHub CI; local execution may skip only the unavailable PostgreSQL instance. Report exact tests and remaining risks.
 
 ### Task 2: SQLite-free Mac bridge
 
 Files: create `kakao-cloud.js`, `kakao-cloud-reader.py`, `kakao-cloud.test.js`.
 
-- [ ] Test collection from a fake cloud state and read-only reader: only approved messages, exact large IDs, duplicate JOIN collapse, no local SQLite import, no checkpoint advancement on failed cloud writes.
-- [ ] Implement `collect`, `context`, `review <file>`, `status` CLI commands. Configuration uses the existing private publisher file or environment, never tracked credentials. Ephemeral 0600 review artifacts are not authoritative storage.
-- [ ] `collect` obtains server cursors, reads Kakao using the existing local Python package, redacts protocol credentials with existing redactor, and sends batches. `context` reads cloud graph/pending sources; `review` reads a prepared JSON review and sends directly to the server.
-- [ ] Test with `node --test kakao-cloud.test.js` and Python syntax validation; then perform a real collect/review replay/status without opening ontology.sqlite.
+- [x] Test collection from a fake cloud state and read-only reader: only approved messages, exact large IDs, duplicate JOIN collapse, no local SQLite import, no checkpoint advancement on failed cloud writes.
+- [x] Implement `collect`, `context`, `review <file>`, `status` CLI commands. Configuration uses the existing private publisher file or environment, never tracked credentials. Ephemeral 0600 review artifacts are not authoritative storage.
+- [x] `collect` obtains server cursors, reads Kakao using the existing local Python package, redacts protocol credentials with existing redactor, and sends batches. `context` reads cloud graph/pending sources; `review` reads a prepared JSON review and sends directly to the server.
+- [x] Test with `node --test kakao-cloud.test.js` and Python syntax validation; then perform a real collect/review replay/status without opening ontology.sqlite.
 
 ### Task 3: Retirement, deployment and automation cutover
 
 Files: create retirement/archive and legacy-redirect scripts/tests as needed; update README, `docs/supabase-publisher.md`, existing GitHub transfer tests, existing pm automation prompt.
 
-- [ ] Archive the final local rows in administrator-only recovery storage with manifest counts and hashes, using the existing encrypted backup and recovery patterns; do not make old audit transactions active undo actions over cloud edits.
-- [ ] Publish only task files onto latest origin/main, preserving concurrent changes. Run real PostgreSQL tests, migration and count/hash checks in GitHub Actions. Confirm hosted Supabase reads and unchanged replay.
-- [ ] Deploy a legacy Firebase Hosting redirect preserving query and hash to GitHub Pages. Do not change Firestore, Firebase Auth or passwords.
-- [ ] Update existing pm automation to use `node kakao-cloud.js collect`, cloud context and direct `review`; forbid local SQLite/importers/publishers as operational inputs. Keep schedule/allowlist/privacy rules.
-- [ ] Verify the actual redirect, cloud state, no-op second collection and automation configuration. Record proof and limitations; no deletion of old local backups.
+- [x] Archive the final local rows in administrator-only recovery storage with manifest counts and hashes, using the existing encrypted backup and recovery patterns; do not make old audit transactions active undo actions over cloud edits.
+- [x] Publish only task files onto latest origin/main, preserving concurrent changes. Run real PostgreSQL tests, migration and count/hash checks in GitHub Actions. Confirm hosted Supabase reads and unchanged replay.
+- [x] Deploy a legacy Firebase Hosting redirect preserving query and hash to GitHub Pages. Do not change Firestore, Firebase Auth or passwords.
+- [x] Update existing pm automation to use `node kakao-cloud.js collect`, cloud context and direct `review`; forbid local SQLite/importers/publishers as operational inputs. Keep schedule/allowlist/privacy rules.
+- [x] Verify the actual redirect, cloud state, no-op second collection and automation configuration. Record proof and limitations; no deletion of old local backups.
+
+
+## Verified cutover — 2026-10-18
+
+- Main integration: `c8e9386322a4438d112337803924d58dcc6ef8fc`; additive Kakao migration is version `202610180005`, preserving the concurrently added final-Part migration `202610180004`.
+- [GitHub cloud-authority run 39143745210](https://github.com/louiscxcix/lspm/actions/runs/39143745210): all 30 focused tests passed with real PostgreSQL; production schema, publication safety, retirement archive and hosted API checks succeeded. The local combined compatibility suite passed 38 tests.
+- 9,762 original local rows across all tables are retained privately, including 331 audit changes, 408 ingestion jobs and original source bytes. Count/hash checks passed; operational rows were not restored or replaced.
+- Direct live collection succeeded with Node's database module blocked, returning zero new messages and cloud-owned cursors. A legitimate historical invitation feed was classified source-only; identical review replay returned the same receipt without creating Events.
+- Cloud retains 420 legacy sources whose original processing metadata was absent, plus 23 unresolved records. These are preserved historical context, not new messages or authorization for bulk Event regeneration. Routine automation explicitly guards this backlog.
+- The pm heartbeat remains active at the existing Mexico City times, now using direct collect/context/review and forbidding the old PM database/publishers.
+- Firebase Hosting now serves only the redirect; a real Chromium session preserved the project hash and edit query, reached GitHub Pages and reported zero page errors. Firebase data and Auth were not changed.
+- Existing local backups remain undeleted. The familiar desktop launcher opens the cloud application; the retired publisher refuses ordinary invocation.
