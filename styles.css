@@ -744,9 +744,9 @@ body:not([data-access="owner"]) .project-access-settings {display:none!important
 .map-resize-bar:active::before { background:#fff; }
 .overview:has(.map-resize-bar) { height:auto; overflow:visible; }
 .map-panel:has(.map-resize-bar) { display:flex; flex-direction:column; height:auto; min-height:0; }
-.event-history-layout > .map-stage { align-self:flex-start; height:var(--map-h,min(68vh,760px)); }
-#productionMapStage { height:var(--map-h,min(68vh,760px)); min-height:240px; max-height:none; }
+.event-history-layout > .map-stage { align-self:flex-start; min-height:240px; }
+#mapStage,#productionMapStage { min-height:240px; max-height:none; }
 .map-fullscreen .map-resize-bar { display:none; }
-.map-fullscreen .event-history-layout > .map-stage,.map-fullscreen #productionMapStage { height:auto; align-self:stretch; flex:1 1 auto; min-height:0; }
+.map-fullscreen #mapStage,.map-fullscreen #productionMapStage { height:auto !important; min-height:0 !important; max-height:none !important; align-self:stretch !important; }
 
 body.production-progress-active :is(.map-part-actions,.part-model-group>summary input,.part-model-group>summary button) {display:none;}

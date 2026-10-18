@@ -420,10 +420,17 @@ function render() {
 }
 function placeMapResize(stage){
   const anchor=stage.closest('.event-history-layout')||stage;
+  const apply=height=>{
+    const next=Math.round(Math.max(240,Math.min(window.innerHeight*1.8,height)));
+    stage.style.height=next+'px';
+    stage.style.minHeight='240px';
+    stage.style.maxHeight='none';
+    stage.style.alignSelf='flex-start';
+    return next;
+  };
   let handle=anchor.parentElement.querySelector(':scope > .map-resize-bar');
   if(!handle){
     handle=document.createElement('div');handle.className='map-resize-bar';handle.tabIndex=0;handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','horizontal');handle.setAttribute('aria-label','프로세스 맵 크기');
-    const apply=height=>{const next=Math.round(Math.max(240,Math.min(window.innerHeight*1.8,height)));stage.style.setProperty('--map-h',next+'px');handle.setAttribute('aria-valuenow',String(next));return next;};
     handle.onpointerdown=event=>{
       if(event.button!==0)return;event.preventDefault();
       const startY=event.clientY,startH=stage.getBoundingClientRect().height;
@@ -436,7 +443,7 @@ function placeMapResize(stage){
   }
   anchor.before(handle);
   const saved=Number(localStorage.getItem('pm-map-height:'+stage.id));
-  if(saved>=240)stage.style.setProperty('--map-h',saved+'px');
+  apply(saved>=240?saved:Math.round(Math.min(window.innerHeight*0.68,760)));
 }
 function renderProjectEntry() {
   const workstreams=store.workstreams||{};
