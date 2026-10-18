@@ -418,63 +418,68 @@ function render() {
   $('#sampleRiskTabs').querySelectorAll('[data-sample-risk]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.sampleRisk===sampleRiskMode)));
   samplePreparationUI.update(showPreparation?{workspace,store,container:$('#samplePreparationPanel'),readOnly:window.PUBLIC_READ_ONLY||basicAccess}:null);
 }
+const mapResizeStates=new WeakMap();
 function placeMapResize(stage){
   if(stage.closest('.map-fullscreen'))return;
-  const layout=stage.closest('.event-history-layout');
-  const anchor=layout||stage,target=anchor;
-  let handle=anchor.parentElement.querySelector(':scope > .map-resize-bar');
-  const apply=height=>{
-    const next=Math.round(Math.max(240,Math.min(4000,height)));
-    const overview=stage.closest('.overview');
-    if(overview){overview.style.setProperty('height','auto','important');overview.style.setProperty('overflow','visible','important');}
-    const mapPanel=stage.closest('.map-panel');
-    if(mapPanel){mapPanel.style.setProperty('display','flex','important');mapPanel.style.setProperty('flex-direction','column','important');mapPanel.style.setProperty('height','auto','important');mapPanel.style.setProperty('overflow','visible','important');}
-    const records=stage.closest('.records-view');
-    if(records)records.style.setProperty('overflow','visible','important');
-    target.style.setProperty('height',next+'px','important');
-    target.style.setProperty('min-height','0','important');
-    target.style.setProperty('max-height',next+'px','important');
-    target.style.setProperty('flex','0 0 auto','important');
-    target.style.setProperty('overflow','hidden','important');
-    if(layout){stage.style.setProperty('height','100%','important');stage.style.setProperty('min-height','0','important');stage.style.setProperty('max-height','none','important');stage.style.setProperty('overflow','auto','important');}
-    return next;
-  };
-  if(!handle){
-    handle=document.createElement('div');
-    handle.className='map-resize-bar';
-    handle.setAttribute('role','separator');
-    handle.setAttribute('aria-orientation','horizontal');
-    handle.setAttribute('aria-label','프로세스 맵 크기');
+  const target=stage.closest('.event-history-layout')||stage;
+  let state=mapResizeStates.get(stage);
+  if(!state){
+    const minimum=240,maximum=4000,handle=document.createElement('div');
+    state={handle,target,height:0,drag:null};mapResizeStates.set(stage,state);
+    const defaultHeight=()=>Math.min(window.innerHeight*0.62,720);
+    const apply=height=>{
+      const next=Math.round(Math.max(minimum,Math.min(maximum,height)));
+      state.height=next;state.target.style.setProperty('--map-height',next+'px');
+      handle.setAttribute('aria-valuenow',String(next));
+      handle.setAttribute('aria-valuetext','지도 높이 '+next+'픽셀');
+      handle.querySelector('span').textContent=next+'px';
+      return next;
+    };
+    const save=()=>{try{localStorage.setItem('pm-map-height:'+stage.id,String(state.height));}catch{}};
+    handle.className='map-resize-bar';handle.tabIndex=0;
+    handle.setAttribute('role','separator');handle.setAttribute('aria-orientation','horizontal');
+    handle.setAttribute('aria-label','프로세스 맵 높이');handle.setAttribute('aria-valuemin',String(minimum));handle.setAttribute('aria-valuemax',String(maximum));
+    handle.title='아래로 늘리기 · 위로 줄이기 · 방향키로 조절 · 두 번 클릭하면 기본 크기';
+    handle.innerHTML='<span class="map-resize-value" aria-hidden="true"></span>';
     handle.addEventListener('pointerdown',event=>{
-      if(event.button!==0)return;
-      event.preventDefault();event.stopPropagation();
-      const startY=event.clientY,startH=target.getBoundingClientRect().height,startBottom=target.getBoundingClientRect().bottom;
+      if(event.button!==0||event.isPrimary===false||state.drag)return;
+      event.preventDefault();event.stopPropagation();handle.focus({preventScroll:true});
+      state.drag={id:event.pointerId,y:event.clientY,height:state.height};
+      handle.classList.add('is-dragging');document.body.classList.add('map-resizing');
       handle.setPointerCapture(event.pointerId);
       const move=ev=>{
-        if(ev.pointerId!==event.pointerId)return;
-        apply(startH-(ev.clientY-startY));
-        const drift=target.getBoundingClientRect().bottom-startBottom;
-        if(Math.abs(drift)>0.5)window.scrollBy(0,drift);
+        if(ev.pointerId!==state.drag?.id)return;
+        ev.preventDefault();apply(state.drag.height+ev.clientY-state.drag.y);
       };
       const end=ev=>{
-        if(ev.pointerId!==event.pointerId)return;
-        handle.removeEventListener('pointermove',move);
-        handle.removeEventListener('pointerup',end);
-        handle.removeEventListener('pointercancel',end);
-        localStorage.setItem('pm-map-height:'+stage.id,String(Math.round(target.getBoundingClientRect().height)));
+        if(!state.drag||ev.pointerId!=null&&ev.pointerId!==state.drag.id)return;
+        if(ev.type==='pointerup')move(ev);
+        const id=state.drag.id;state.drag=null;
+        window.removeEventListener('pointermove',move,true);window.removeEventListener('pointerup',end,true);window.removeEventListener('pointercancel',end,true);window.removeEventListener('blur',end);
+        if(handle.hasPointerCapture(id))handle.releasePointerCapture(id);
+        handle.classList.remove('is-dragging');document.body.classList.remove('map-resizing');save();
       };
-      handle.addEventListener('pointermove',move);
-      handle.addEventListener('pointerup',end);
-      handle.addEventListener('pointercancel',end);
+      // A view refresh may move this bar or wrap the map during a drag.
+      // Window listeners keep the same gesture alive if pointer capture is lost.
+      window.addEventListener('pointermove',move,{capture:true,passive:false});window.addEventListener('pointerup',end,true);window.addEventListener('pointercancel',end,true);window.addEventListener('blur',end);
     });
+    handle.addEventListener('keydown',event=>{
+      const step=event.shiftKey?80:24;
+      const height=event.key==='ArrowDown'?state.height+step:event.key==='ArrowUp'?state.height-step:event.key==='Home'?minimum:event.key==='End'?maximum:null;
+      if(height==null)return;event.preventDefault();event.stopPropagation();apply(height);save();
+    });
+    handle.addEventListener('dblclick',()=>{apply(defaultHeight());save();});
+    let saved;try{saved=Number(localStorage.getItem('pm-map-height:'+stage.id));}catch{}
+    state.target.classList.add('map-size-target');apply(saved>=minimum&&saved<=maximum?saved:defaultHeight());
   }
-  anchor.before(handle);
-  if(!target.dataset.mapSized){
-    const saved=Number(localStorage.getItem('pm-map-height:'+stage.id));
-    apply(saved>=240&&saved<=4000?saved:Math.round(Math.min(window.innerHeight*0.62,720)));
-    target.dataset.mapSized='1';
+  if(state.target!==target){
+    state.target.classList.remove('map-size-target');state.target.style.removeProperty('--map-height');state.target=target;
   }
+  target.classList.add('map-size-target');target.style.setProperty('--map-height',state.height+'px');
+  // Reinserting an already positioned element drops its pointer capture.
+  if(state.handle.nextElementSibling!==target)target.before(state.handle);
 }
+
 function renderProjectEntry() {
   const workstreams=store.workstreams||{};
   const descriptions={commercial:'Customer requests, quotation, orders and forecasts',engineering:'Requirements, design, revisions and validation',purchasing:'Suppliers, materials, tooling and purchasing',production:'Part routes, machines, workers and line release',quality:'APQP, gates, inspection and approval evidence',logistics:'Inbound supply, inventory, packing and delivery'};

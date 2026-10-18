@@ -742,11 +742,17 @@ body:not([data-access="owner"]) .project-access-settings {display:none!important
 .map-resize-bar::before { content:''; position:absolute; left:50%; top:50%; width:72px; height:5px; transform:translate(-50%,-50%); border-radius:3px; background:#6e8796; pointer-events:none; }
 .map-resize-bar:hover,.map-resize-bar.is-dragging { background:#1261d8; }
 .map-resize-bar:hover::before,.map-resize-bar.is-dragging::before { background:#fff; }
-.overview:has(.map-resize-bar) { height:auto; overflow:visible; }
-.map-panel:has(.map-resize-bar) { display:flex; flex-direction:column; height:auto; min-height:0; }
-.event-history-layout > .map-stage { align-self:flex-start; min-height:240px; }
-#mapStage,#productionMapStage { min-height:240px; max-height:none; }
-.map-fullscreen .map-resize-bar { display:none; }
-.map-fullscreen #mapStage,.map-fullscreen #productionMapStage { height:auto !important; min-height:0 !important; max-height:none !important; align-self:stretch !important; }
+.map-resize-value {position:absolute;right:12px;top:5px;font-size:12px;color:#345369;pointer-events:none;}
+.map-resize-bar:hover .map-resize-value,.map-resize-bar.is-dragging .map-resize-value {color:#fff;}
+body.map-resizing,body.map-resizing * {cursor:ns-resize!important;user-select:none!important;}
+.overview:has(.map-resize-bar) {height:auto;min-height:0;overflow:visible;}
+.map-panel:has(.map-resize-bar),.overview.lens-only .map-panel:has(.map-resize-bar) {display:flex;flex-direction:column;height:auto;min-height:0;overflow:visible;}
+.map-size-target {height:var(--map-height);min-height:0;max-height:none;flex:0 0 auto;overflow:hidden;}
+.map-stage.map-size-target {height:var(--map-height);overflow:auto;}
+.map-size-target.event-history-layout>.map-stage {height:100%;min-height:0;max-height:none;align-self:stretch;}
+.map-size-target>.event-history-panel {max-height:100%;}
+#mapStage,#productionMapStage {min-height:240px;max-height:none;}
+.map-fullscreen .map-resize-bar {display:none;}
+.map-fullscreen :is(.map-size-target,.map-stage,#mapStage,#productionMapStage) {height:auto!important;min-height:0!important;max-height:none!important;flex:1 1 0!important;align-self:stretch!important;}
 
 body.production-progress-active :is(.map-part-actions,.part-model-group>summary input,.part-model-group>summary button) {display:none;}
