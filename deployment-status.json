@@ -1,6 +1,11 @@
 {
-  "commit": "a12064d515fa82fc6e9d1d82407bfd815a8cfe17",
-  "runId": "39164802188",
-  "conclusion": "success",
-  "failedSteps": []
+  "commit": "9a4c9388333dd8b537c35829c6d6f626107aa139",
+  "runId": "39169374677",
+  "conclusion": "failure",
+  "failedSteps": [
+    {
+      "job": "deploy",
+      "step": "Verify hosted Supabase endpoint"
+    }
+  ]
 }
