@@ -1,5 +1,7 @@
 # Firebase data transfer and ongoing Kakao publication
 
+**Operational cutover:** the SQLite-to-cloud publisher below is a retained migration utility, not the ongoing pipeline. Use `kakao-cloud.js` and [the current collection guide](supabase-publisher.md). Supabase owns collection cursors and review outcomes; local PM data is an archive, never a fallback.
+
 ## Verified transfer status
 
 The fixed-time export from **2026-10-16 20:38:57 (Mexico City)** was imported and

@@ -1,0 +1,8 @@
+{
+  "hosting": {
+    "site": "louis-lgls-pm",
+    "public": "legacy-site",
+    "rewrites": [{"source": "**", "destination": "/index.html"}],
+    "headers": [{"source": "**", "headers": [{"key": "Cache-Control", "value": "no-store"}]}]
+  }
+}

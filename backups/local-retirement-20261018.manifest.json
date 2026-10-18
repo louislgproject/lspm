@@ -1,0 +1,28 @@
+{
+  "format": "pm-retired-local-v1",
+  "revision": 341,
+  "sha256": "bca03fa947e107aad8467582d4bf5adeadb3e10a670eeb10813dac6a2cd76317",
+  "encryptedSha256": "5ce502787173596665f91efa7c784cb12cca2624cc9b5255ef06495598b94853",
+  "counts": {
+    "change_sets": 331,
+    "entities": 1743,
+    "entity_changes": 122,
+    "event_change_proposals": 0,
+    "hourly_records": 0,
+    "ingestion_jobs": 408,
+    "meta": 11,
+    "production_staffing_counts": 0,
+    "project_assessments": 0,
+    "project_memberships": 946,
+    "project_schedules": 60,
+    "project_view_settings": 15,
+    "project_workstreams": 1264,
+    "projects": 6,
+    "relations": 3980,
+    "sample_preparation_records": 0,
+    "sources": 876,
+    "staffing_counts": 0,
+    "wip_counts": 0,
+    "wip_snapshots": 0
+  }
+}

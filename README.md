@@ -1,8 +1,16 @@
-# PM Process Twin — local ontology
+# Louis Kim LGLS
 
-The Supabase migration adds a private, editable online workspace hosted by GitHub Pages with Supabase Auth and PostgreSQL. See [Supabase migration and deployment](docs/supabase-migration.md) for setup, validation, original SQLite data import, and current deployment status. The local SQLite workflow below remains available.
+Production application: **https://louiscxcix.github.io/lspm/**. GitHub owns application code and deployment; Supabase owns projects, ontology, History, Progress, hourly production, access settings, source originals and collection checkpoints. A local PM database is not an operational source or fallback.
 
-One local SQLite database holds all ontology objects. Projects are saved selections of those objects, with their own assessments, scoped relationships, and view settings. A new database starts empty. **No Firebase, Firestore, or browser data is migrated.** Existing remote Firebase data is not changed or deleted.
+Only read-only Kakao collection runs on the Mac. Run `node kakao-cloud.js collect` to obtain cursors from Supabase and retain new originals directly there. Review the private temporary context and use `node kakao-cloud.js review review.json` for a source-backed, atomic cloud History commit. See [cloud-authoritative collection](docs/supabase-publisher.md). The existing publisher credential remains private; routine runs do not open the retired PM database.
+
+Changes to `main` use the existing GitHub Actions deployment. `Verify cloud authority and archive retired local data` verifies direct collection/review and preserves the final local audit/source rows privately without replacing online edits. The old Firebase site contains only a route-preserving redirect; Firestore and Firebase Auth are not application dependencies.
+
+## Archived local development documentation
+
+The material below documents the former offline application for recovery and development only. Do not run its local server, importers or database publisher as a production workflow. Existing local files are retained, not deleted.
+
+Historically, one local SQLite database held the ontology objects and projects were saved selections of those objects. The original local and Firebase data have since been retained in private Supabase archives; current application records are in Supabase. Never import a blank or old local snapshot over the live workspace.
 
 ## Start
 

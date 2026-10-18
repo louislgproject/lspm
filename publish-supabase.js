@@ -74,5 +74,9 @@ async function publish({fetchImpl=fetch,configFile=configPath,stateFile=cachePat
   for(const row of rows){if(Buffer.byteLength(JSON.stringify(row.row))>380000)throw Error('PUBLISH_RECORD_REQUIRES_ATTACHMENT_TRANSFER');if(batch.length>=200||Buffer.byteLength(JSON.stringify(batch))+Buffer.byteLength(JSON.stringify(row))>390000)await flush();batch.push(row);}await flush();
   return {changed,conflicts,revision,recordsConsidered:rows.length};
 }
-if(require.main===module)publish({statusOnly:process.argv.includes('--status')}).then(result=>{console.log(JSON.stringify(result));if(result.conflicts)process.exitCode=2;}).catch(e=>{console.error(/^[A-Z_0-9]+$/.test(e.message)?e.message:'SUPABASE_PUBLISH_FAILED');process.exitCode=1;});
+if(require.main===module){
+  // The retired snapshot must never silently become an operational writer again.
+  if(!process.argv.includes('--status')&&!process.argv.includes('--migration-only')){console.error('LOCAL_PM_PUBLISHER_RETIRED_USE_KAKAO_CLOUD');process.exitCode=1;}
+  else publish({statusOnly:process.argv.includes('--status')}).then(result=>{console.log(JSON.stringify(result));if(result.conflicts)process.exitCode=2;}).catch(e=>{console.error(/^[A-Z_0-9]+$/.test(e.message)?e.message:'SUPABASE_PUBLISH_FAILED');process.exitCode=1;});
+}
 module.exports={changesFrom,publish};
