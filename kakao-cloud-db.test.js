@@ -5,7 +5,7 @@ const {createHash,randomUUID}=require('node:crypto');
 const {execFileSync}=require('node:child_process');
 const fs=require('node:fs'),path=require('node:path');
 const sha=value=>createHash('sha256').update(value).digest('hex');
-const migration='supabase/migrations/202610180004_kakao_cloud.sql';
+const migration='supabase/migrations/202610180005_kakao_cloud.sql';
 const chats=['453981707667079','461913194057523','473535309242980','481868546664117'];
 
 // The development checkout can predate these dependencies. CI uses its checked-out files.

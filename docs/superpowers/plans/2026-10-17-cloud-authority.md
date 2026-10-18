@@ -19,7 +19,7 @@
 
 ### Task 1: Server-owned Kakao collection and review
 
-Files: create `supabase/migrations/202610180004_kakao_cloud.sql`, `kakao-cloud-db.test.js`.
+Files: create `supabase/migrations/202610180005_kakao_cloud.sql`, `kakao-cloud-db.test.js`.
 
 Interfaces:
 - `pm_kakao_context(p_token TEXT)` returns `{checkpoints:{chatId:logId},graph:{entities,relations},projects:[],pending:[],unresolved:[],revision,fetchedAt}`. Pending sources include sourceId, text (call metadata withheld), metadata. No public access without the owner-bound capability.
