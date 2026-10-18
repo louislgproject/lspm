@@ -745,3 +745,5 @@ body:not([data-access="owner"]) .project-access-settings {display:none!important
 .analysis-split-bar { flex:0 0 12px; cursor:row-resize; background:#d5e0e6; touch-action:none; }
 .analysis-split-bar[hidden] { display:none !important; }
 .analysis-split-bar:hover,.analysis-split-bar:active { background:#1261d8; }
+
+body.production-progress-active :is(.map-part-actions,.part-model-group>summary input,.part-model-group>summary button) {display:none;}
