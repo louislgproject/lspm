@@ -18,8 +18,16 @@ async function verifyBackend({baseUrl='https://ahzpuefosoajwwgbfhng.supabase.co'
         const workspaceResponse=await fetchImpl(baseUrl+'/functions/v1/ontology/api/public/workspace',{headers:{Origin:origin},signal:AbortSignal.timeout(15000)});
         const workspace=await workspaceResponse.json().catch(()=>({}));
         if(workspaceResponse.status!==200||!Array.isArray(workspace.projects)||!Array.isArray(workspace.library?.entities)||!Array.isArray(workspace.library?.relations))throw Error('Public workspace data check failed: HTTP '+workspaceResponse.status+'.');
-        if(workspace.projects[0])for(const route of ['progress','hourly','sample-preparation']){
-          const response=await fetchImpl(baseUrl+'/functions/v1/ontology/api/public/'+route+'?'+new URLSearchParams({project:workspace.projects[0].id}),{headers:{Origin:origin},signal:AbortSignal.timeout(15000)});
+        const project=workspace.projects.find(item=>item.viewPending)||workspace.projects[0];
+        let viewToken='';
+        if(project?.viewPending){
+          const unlock=await fetchImpl(baseUrl+'/functions/v1/ontology/api/public/unlock',{method:'POST',headers:{Origin:origin,'Content-Type':'application/json'},body:JSON.stringify({projectId:project.id,password:'7777777'}),signal:AbortSignal.timeout(15000)});
+          const unlocked=await unlock.json().catch(()=>({}));
+          if(unlock.status!==200||typeof unlocked.token!=='string')throw Error('Project password check failed: HTTP '+unlock.status+'.');
+          viewToken=unlocked.token;
+        }
+        if(project)for(const route of ['progress','hourly','sample-preparation']){
+          const response=await fetchImpl(baseUrl+'/functions/v1/ontology/api/public/'+route+'?'+new URLSearchParams({project:project.id}),{headers:{Origin:origin,...(viewToken?{'x-project-access':viewToken}:{})},signal:AbortSignal.timeout(15000)});
           const value=await response.json().catch(()=>null);
           if(response.status!==200||(route==='progress'? !Array.isArray(value?.snapshots)||!Array.isArray(value?.rows):!Array.isArray(value)))throw Error('Latest production view '+route+' failed: HTTP '+response.status+'.');
         }
