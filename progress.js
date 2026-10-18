@@ -12,7 +12,7 @@
     if(typeof text!=='string'||!text.trim()||text.length>200000)throw Error('Paste 1–200,000 characters.');
     let time=capturedAt?timestamp(capturedAt):new Date().toISOString(),part=partId,header=[],longHeader=null;const rows=[],warnings=[];
     const parts=project.entities.filter(e=>M.isProductPart(e));
-    const resolvePart=name=>{const m=parts.filter(p=>norm(p.name)===norm(name));return m.length===1?m[0].id:'';};
+    const resolvePart=name=>{const m=parts.filter(p=>norm(p.name)===norm(name)||p.sourcePartName&&norm(p.sourcePartName)===norm(name));return m.length===1?m[0].id:'';};
     const add=(label,value,row,column,t=time,p=part,u=unit)=>{if(value===''||value==='—'||value==='-'||value==null)return;const quantity=Number(String(value).replace(/,/g,''));rows.push({capturedAt:t,partId:p,partName:M.byId(project,p)?.name||'',stage:label,stepId:matchStep(project,p,label),quantity,unit:unitKey(u),row,column});};
     const lines=text.split(/\r?\n/),grid=lines.map(cells);
     const headerRow=grid.slice(0,40).findLastIndex(c=>c.some(v=>/^(?:pjt\s*명|품명|제품명|part\s*name)$/i.test(v))&&c.some(v=>/^(?:모델명|모델코드|품번|model\s*code|part\s*code)$/i.test(v)));

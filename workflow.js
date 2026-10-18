@@ -119,11 +119,22 @@
   // Explicit line/process links only. Both firstContacts have priority 1; managers are later escalation.
   function reportingContacts(project,entityId) {
     const byId=new Map(project.entities.filter(e=>e.status!=='archived').map(e=>[e.id,e]));
-    const relations=project.relations.filter(r=>(!r.scopeProjectId||r.scopeProjectId===project.id)&&byId.has(r.from)&&byId.has(r.to)&&(!r.reviewState||r.reviewState==='confirmed')).slice().sort((a,b)=>a.id.localeCompare(b.id));
+    const relations=project.relations.filter(r=>(project.id==='library'||!r.scopeProjectId||r.scopeProjectId===project.id)&&byId.has(r.from)&&byId.has(r.to)&&(!r.reviewState||r.reviewState==='confirmed')).slice().sort((a,b)=>a.id.localeCompare(b.id));
     const isLine=e=>e?.type==='Resource'&&e.resourceKind==='line';
     const used=new Map(),remember=r=>used.set(r.id,r),sort=items=>items.slice().sort((a,b)=>a.id.localeCompare(b.id));
     const result={entityId,status:'unknown',line:null,lines:[],entryMode:'either',firstContacts:[],laterManagers:[],relations:[]};
     let entity=byId.get(entityId);const visited=new Set();
+    if(['Part','Part Revision'].includes(entity?.type)){
+      // A recorded line output establishes line responsibility for the part,
+      // including intermediate components. Do not infer people from its name.
+      let parts=new Set([entity.id]);const seen=new Set(parts);
+      while(parts.size){
+        const outputs=relations.filter(r=>r.type==='produces'&&parts.has(r.to)&&isLine(byId.get(r.from)));
+        if(outputs.length){outputs.forEach(remember);result.lines=sort([...new Set(outputs.map(r=>r.from))].map(id=>byId.get(id)));break;}
+        const parents=relations.filter(r=>['part_of','revision_of'].includes(r.type)&&parts.has(r.from)&&['Part','Part Revision'].includes(byId.get(r.to)?.type)&&!seen.has(r.to));
+        parents.forEach(remember);parts=new Set(parents.map(r=>r.to));parts.forEach(id=>seen.add(id));
+      }
+    }
     while(entity&&!isLine(entity)&&!visited.has(entity.id)){
       visited.add(entity.id);
       if(!['Production Step','Work Item'].includes(entity.type))break;

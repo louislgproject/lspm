@@ -23,9 +23,9 @@ part has its own object ID, observations, hourly measurements and Unit Time.
 Neither common process steps nor identical times merge different final parts.
 
 The migrations register **IB RH, IB LH, OB RH, OB LH** for every LQ2 model
-(STD, OPT, LWR and primary light source), RH/LH for the other recorded LS models,
+(STD, OPT and LWR), LH/RH only for primary light source, RH/LH for the other recorded LS models,
 and STD/OPT × RH/LH for the separate **T1-2 Lower** model. The complete catalog
-contains 42 final identities. Existing identities and measurements are reused;
+contains 40 final identities after the Primary correction. Existing identities and measurements are reused;
 official product codes and quantities are not generated. T1-2 Lower has no
 confirmed route: its children show **공정 미등록**, and neither Base nor Uplevel
 routes are assigned to it. Hourly quantities can still be entered per Lower part.
@@ -51,3 +51,31 @@ Progress original text remains in its private source record and History. Older
 Progress Events are normalized when read so their legacy missing status or raw
 text field cannot block later project edits; their original source is retained.
 Current Firebase archives remain unchanged.
+
+
+The 2026-10-18 owner review corrected Primary to LH/RH only. The four mistaken
+IB/OB identities remain archived with `replacedByPartId` links so saved map
+selections resolve to the reviewed parts. Original measurements remain on their
+original IDs; no historical quantities or targets are copied or summed. Retired
+classifications with observations remain selectable as **기존 분류 (원본 실적)**.
+
+LDM final and intermediate parts now have explicit `LDM → produces → Part`
+line-context links. These carry no output quantity. Part details follow the
+existing line escalation groups, Leader/Supervisor membership, line manager and
+recorded `reports_to` chain. No individual station assignment or new title is
+inferred. Global Library follows these same visible ontology links. Unlinked
+parts and parts with conflicting line links retain unknown/ambiguous contacts.
+
+
+T1XL has exactly two finished parts, **T1XL LH** and **T1XL RH**. Their original
+IDs and LH/RH observations remain unchanged; Upper/Lower PCB and assembly
+components remain intermediate parts. Original long labels are retained as
+`sourcePartName` and accepted for exact-name Progress import.
+
+Only G65 Upper/Lower × RH/LH have numbered components **1** and **2**. Each
+Integration consumes one of each, scoped to that exact final part, and produces
+its intermediate `main` assembly. The existing LAM operation connects this
+assembly to the final identity. Existing Upper RH component and assembly IDs
+are reused. Cornering, Side Marker and Jewelry Piece do not receive this BOM.
+Router per-panel yields remain separate and unchanged; no LH yield, additional
+material, machine asset or measured output is invented.

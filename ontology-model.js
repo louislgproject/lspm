@@ -137,6 +137,7 @@
   TEXT_FIELDS.push('inOut');
   TEXT_FIELDS.push('productOption');
   TEXT_FIELDS.push('routeStatus');
+  TEXT_FIELDS.push('replacedByPartId');
   TEXT_FIELDS.push('qualityKind','qualityCode','qualityColor','qualityDisposition','qualityGroup','qualityFamily','qualityPlan','qualityCC','qualityDocument');
   const LONG_TEXT_FIELDS = ["assessmentNote", "operatorAction", "acceptanceCriteria", "failureAction"];
   const PRODUCTION_EVENT_KINDS = ['arrived','started','completed','failed','held','released'];
@@ -242,7 +243,7 @@
     if (relation.routePartId && !isProductPart(byId(store, relation.routePartId))) return "Material route Part must be an existing product Part.";
     const scope = relation.scopeProjectId ?? null;
     const inScope = item => (item.scopeProjectId ?? null) === scope;
-    if (store.relations.some(item => inScope(item) && item.from === relation.from && item.to === relation.to && item.type === relation.type)) return "This relationship already exists.";
+    if (store.relations.some(item => inScope(item) && item.from === relation.from && item.to === relation.to && item.type === relation.type && (!material || (item.routePartId||'') === (relation.routePartId||'')))) return "This relationship already exists.";
     if (relation.type === "reports_to" && store.relations.some(item => inScope(item) && item.type === "reports_to" && item.from === relation.from)) return "A person can have one direct reporting manager.";
     if (["precedes", "reports_to", "part_of"].includes(relation.type) && createsCycle(store, relation.from, relation.to, relation.type, scope)) return relation.type === "precedes" ? "This dependency would create a cycle." : "This " + relation.type + " relationship would create a cycle.";
     return "";

@@ -65,7 +65,7 @@
   }
   project(){return this.demo?this.sample().project:this.ctx.store;}
   allRows(){return H.latest(this.demo?this.sample().rows:this.rows).filter(r=>H.isModel(r)&&H.productionDay(r.start)===this.date).map(r=>{const rate=H.rateFor(this.ctx.workspace?.viewSettings?.[this.ctx.store.id]?.hourlyRates,r.partId,this.date);return rate&&r.unit==='pcs'?{...r,originalTarget:r.target,target:H.capacity(rate.unitTimeSeconds,(Date.parse(r.end)-Date.parse(r.start))/1000).target,planVersion:'Unit Time '+rate.effectiveDate+' · 15%'}:r;});}
-  viewParts(){const parts=this.parts(),ids=new Set(parts.map(p=>p.id));return [...parts,...this.ctx.store.entities.filter(p=>H.isProductionModel(p)&&!ids.has(p.id)&&this.rows.some(r=>r.partId===p.id)).map(p=>({...p,name:p.name+' · 기존 상위 모델 (상세 미분류)'}))];}
+  viewParts(){const parts=this.parts(),ids=new Set(parts.map(p=>p.id));return [...parts,...this.ctx.store.entities.filter(p=>H.isProductionModel(p)&&!ids.has(p.id)&&this.rows.some(r=>r.partId===p.id)).map(p=>({...p,name:p.name+' · 기존 분류 (원본 실적)'}))];}
   dayRows(){const id=this.viewParts().find(p=>p.id===this.selectedParts[0])?.id;return this.allRows().filter(r=>id&&r.partId===id).sort((a,b)=>Date.parse(a.start)-Date.parse(b.start));}
   graph(kind,store,projection){return projection;}
   layout(kind,store,p,fallback){return fallback;}
