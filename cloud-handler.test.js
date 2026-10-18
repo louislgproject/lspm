@@ -12,7 +12,7 @@ test('Supabase runtime and gateway paths reach public reads and authenticated ed
   const handler=createCloudHandler({allowedOrigins:['https://louiscxcix.github.io'],authenticate:async()=>{signIns++;return {id:'editor'};},withStore:async(id,fn)=>fn(store),withPublicStore:fn=>fn(store)});
   for(const prefix of ['/ontology','/functions/v1/ontology','']){
     const request=(route,options={})=>handler(new Request('https://project.supabase.co'+prefix+'/api/'+route,{...options,headers:{Origin:'https://louiscxcix.github.io',...options.headers}}));
-    const health=await request('public/health');assert.equal(health.status,200,'public route under '+prefix);assert.deepEqual(await health.json(),{ok:true,readOnly:true});
+    const health=await request('public/health');assert.equal(health.status,200,'public route under '+prefix);assert.deepEqual(await health.json(),{ok:true,readOnly:true,mapAssistantConfigured:false,copilotConfigured:false});
     assert.equal(health.headers.get('Access-Control-Allow-Origin'),'https://louiscxcix.github.io');
     const workspace=await request('public/workspace');assert.equal(workspace.status,200);assert.deepEqual((await workspace.json()).projects,[]);
     assert.equal((await request('public/workspace',{method:'POST'})).status,405);
@@ -67,4 +67,17 @@ test('migrated map assistant authenticates, requires consent and keeps provider 
  assert.equal((await request({scopeId:'library',question:'Map?',consent:true},false)).status,401);
  assert.equal((await request({scopeId:'library',question:'Map?'})).status,400);assert.equal(sent,0);
  const before=store.load().revision,response=await request({scopeId:'library',question:'Map?',consent:true}),data=await response.json();assert.equal(response.status,200);assert.deepEqual(data.references,[]);assert.ok(!JSON.stringify(data).includes('fixture-provider-secret'));assert.equal(store.load().revision,before);
+});
+
+test('public map assistant uses the published project and the server key',async t=>{
+ const dir=fs.mkdtempSync(path.join(os.tmpdir(),'pm-public-map-')),store=openStore(path.join(dir,'test.sqlite'));
+ t.after(()=>{store.close();fs.rmSync(dir,{recursive:true,force:true});});
+ let sent='';
+ const handler=createCloudHandler({allowedOrigins:[],withPublicStore:fn=>fn(store),openaiKey:'fixture-provider-secret',openaiFetch:async(_url,options)=>{sent=options.body;return Response.json({choices:[{message:{content:JSON.stringify({answer:'기록된 답',objectIds:[]})}}]});}});
+ const call=body=>handler(new Request('https://example.supabase.co/ontology/api/public/map-assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)}));
+ const response=await call({scopeId:'library',question:'누구?',consent:true,entities:[{name:'injected'}]});
+ assert.equal(response.status,200);assert.equal((await response.json()).answer,'기록된 답');
+ assert.equal(sent.includes('injected'),false);assert.equal(sent.includes('fixture-provider-secret'),false);
+ const denied=createCloudHandler({allowedOrigins:[],withPublicStore:fn=>fn(store)});
+ assert.equal((await denied(new Request('https://example.supabase.co/ontology/api/public/map-assistant',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({scopeId:'library',question:'누구?',consent:true})}))).status,503);
 });

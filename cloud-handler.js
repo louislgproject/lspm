@@ -30,12 +30,25 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
           return await withPublicStore(async store=>{const result=await store.unlock(input.projectId,input.password);return respond(result.error?403:200,result);});
         }catch{return respond(400,{error:'Unable to unlock this project.'});}
       }
+      if(pathname==='/api/public/map-assistant'&&request.method==='POST'){
+        let input;try{input=JSON.parse((await bodyBytes(request)).toString());}catch{return respond(400,{error:'질문을 확인해 주세요.'});}
+        if(input.consent!==true||typeof input.scopeId!=='string'||typeof input.question!=='string')return respond(400,{error:'질문을 확인해 주세요.'});
+        if(!withPublicStore||!openaiKey)return respond(503,{error:'연결되지 않았습니다.'});
+        try{return await withPublicStore(async store=>{
+          const workspace=await store.load(),source=input.scopeId==='library'?workspace.library:(workspace.projects||[]).find(project=>project.id===input.scopeId);
+          if(!source)return respond(404,{error:'프로젝트를 찾지 못했습니다.'});
+          const privateIds=new Set((source.entities||[]).filter(entity=>entity.privacy==='local_only').map(entity=>entity.id));
+          const scope={id:source.id,name:source.name,entities:(source.entities||[]).filter(entity=>!privateIds.has(entity.id)).map(({rawLog,sourceExcerpt,...entity})=>entity),relations:(source.relations||[]).filter(relation=>!privateIds.has(relation.from)&&!privateIds.has(relation.to)).map(({sourceExcerpt,...relation})=>relation)};
+          try{return respond(200,await require('./map-assistant-server').answer({scope,input:{question:input.question,history:input.history,visibleIds:null,consent:true},key:openaiKey,fetchImpl:openaiFetch}));}
+          catch(error){return respond(error.status||502,{error:error.message||'응답하지 못했습니다.'});}
+        },request.headers.get('x-project-access')||'');}catch{return respond(503,{error:'응답하지 못했습니다.'});}
+      }
       if(request.method!=='GET')return respond(405,{error:'Public workspace is read-only.'});
       if(!withPublicStore)return respond(503,{error:'Public workspace is not configured.'});
       const route=pathname.slice('/api/public/'.length);
       if(!['health','workspace','wip','staffing','production-staffing','progress','hourly','sample-preparation'].includes(route))return respond(404,{error:'Not found.'});
       try{return await withPublicStore(async store=>{
-        if(route==='health'){if(store.health)await store.health();else await store.load();return respond(200,{ok:true,readOnly:true});}
+        if(route==='health'){if(store.health)await store.health();else await store.load();return respond(200,{ok:true,readOnly:true,mapAssistantConfigured:Boolean(openaiKey),copilotConfigured:Boolean(openaiKey)});}
         if(route==='workspace'){
           const workspace=await store.load();workspace.pendingChange=null;
           const privateIds=new Set([workspace.library,...workspace.projects].flatMap(graph=>graph.entities.filter(e=>e.privacy==='local_only').map(e=>e.id)));

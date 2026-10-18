@@ -84,7 +84,7 @@ test('public workspace is pinned, readable without login, and cannot be changed 
     assert.equal((await request('public/workspace','POST')).status,405);
     assert.equal((await request('workspace','POST')).status,401);
     assert.equal((await request('public/export')).status,404);
-    response=await request('public/health');assert.deepEqual(await response.json(),{ok:true,readOnly:true});
+    response=await request('public/health');assert.deepEqual(await response.json(),{ok:true,readOnly:true,mapAssistantConfigured:false,copilotConfigured:false});
     // Latest production tables use the same owner boundary and read-only public RPC.
     const fresh=await withPostgresStore(client,owner,s=>s.load());fresh.projects[0].projectType='sample';
     await withPostgresStore(client,owner,s=>s.save(fresh,projectId,fresh.revision));

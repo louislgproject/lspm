@@ -18,6 +18,7 @@
     projectOpen:async()=>{throw Error('PROJECT_PASSWORD_REQUIRED');},
     projectLogin:async(projectId,password)=>{const result=await request('unlock',{projectId,password});tokens[projectId]=result.token;sessionStorage.setItem(tokenKey,JSON.stringify(tokens));return request('workspace');},
     load:()=>request('workspace'),health:()=>request('health'),
+    mapAssistant:input=>request('map-assistant',input),
     settings:async(_project,_view,data)=>data,
     changes:async()=>({changes:[],more:false}),
     wipList:(project,snapshot='')=>request('wip?'+new URLSearchParams({project,snapshot})),
