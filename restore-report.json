@@ -2,11 +2,11 @@
   "status": "restored",
   "revision": 338,
   "counts": {
-    "objects": 1750,
-    "relations": 4235,
+    "objects": 1779,
+    "relations": 4563,
     "projects": 7,
     "sources": 880,
-    "public_objects": 680,
+    "public_objects": 709,
     "archived_rows": 9641
   },
   "previouslyCommitted": true,
