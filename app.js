@@ -402,36 +402,41 @@ function render() {
   hourlyUI.update(!basicAccess&&features.hourly&&progressKind?{workspace,store,kind:progressKind,select:id=>{mapSelectedIds.clear();mapSelectedIds.add(id);decorateMapSelection();}}:null);
   document.querySelectorAll('.production-mode-toolbar').forEach(bar=>bar.hidden=true);
   if(progressKind&&(progressUI.ctx||hourlyUI.ctx)){
-    const stage=$('#'+(progressKind==='production'?'productionMapStage':'mapStage')),container=stage.closest('.event-history-layout')||stage;
-    let bar=container.parentElement.querySelector('.production-mode-toolbar');
-    if(!bar){bar=document.createElement('nav');bar.className='production-mode-toolbar';bar.setAttribute('aria-label','Production data views');}
-    container.before(bar);bar.hidden=false;
+    const stage=$('#'+(progressKind==='production'?'productionMapStage':'mapStage')),anchor=stage.closest('.event-history-layout')||stage;
+    let stack=anchor.closest('.map-stack');
+    if(!stack){stack=document.createElement('div');stack.className='map-stack';anchor.before(stack);stack.append(anchor);}
+    else if(anchor.parentElement!==stack)stack.append(anchor);
+    let bar=stack.parentElement.querySelector(':scope > .production-mode-toolbar')||document.querySelector('.production-mode-toolbar');
+    if(!bar||bar.parentElement!==stack.parentElement){bar=document.createElement('nav');bar.className='production-mode-toolbar';bar.setAttribute('aria-label','Production data views');}
+    stack.before(bar);bar.hidden=false;
     if(progressUI.ctx){bar.append(progressUI.toggleButton);progressUI.view.bar.hidden=!progressUI.active;}
     if(hourlyUI.ctx){bar.append(hourlyUI.toggleButton);hourlyUI.bar.hidden=!hourlyUI.active;}
-    let split=container.parentElement.querySelector(':scope > .analysis-split');
+    let split=stack.querySelector(':scope > .analysis-split');
     if(!split){
       split=document.createElement('div');split.className='analysis-split';split.hidden=true;
-      split.innerHTML='<div class="analysis-pane" data-pane="progress"></div><div class="analysis-split-bar" role="separator" aria-orientation="horizontal" aria-label="경계"></div><div class="analysis-pane" data-pane="hourly"></div>';
+      split.innerHTML='<div class="analysis-pane" data-pane="progress"></div><div class="analysis-split-bar" role="separator" aria-orientation="horizontal" aria-label="위아래 크기"></div><div class="analysis-pane" data-pane="hourly"></div>';
       const handle=split.querySelector('.analysis-split-bar');
       handle.onpointerdown=event=>{
         if(event.button!==0)return;event.preventDefault();
-        const top=split.querySelector('[data-pane="progress"]'),startY=event.clientY,startH=top.getBoundingClientRect().height;
+        const progress=split.querySelector('[data-pane="progress"]'),hourly=split.querySelector('[data-pane="hourly"]'),top=progress.hidden?hourly:progress,startY=event.clientY,startH=top.getBoundingClientRect().height;
         handle.setPointerCapture(event.pointerId);
-        const move=ev=>{const height=Math.max(72,Math.min(split.clientHeight-88,startH+ev.clientY-startY));top.style.flexBasis=height+'px';localStorage.setItem('pm-analysis-split',String(Math.round(height)));};
-        const end=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',end);};
-        handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',end);
+        const move=ev=>{const limit=Math.max(160,stack.clientHeight-160),height=Math.round(Math.max(72,Math.min(limit,startH+ev.clientY-startY)));top.style.flex='0 0 '+height+'px';localStorage.setItem('pm-analysis-split',String(height));};
+        const end=()=>{handle.removeEventListener('pointermove',move);handle.removeEventListener('pointerup',end);handle.removeEventListener('pointercancel',end);};
+        handle.addEventListener('pointermove',move);handle.addEventListener('pointerup',end);handle.addEventListener('pointercancel',end);
       };
-      const saved=Number(localStorage.getItem('pm-analysis-split'));
-      if(saved)split.querySelector('[data-pane="progress"]').style.flexBasis=saved+'px';
     }
-    container.before(split);
+    stack.prepend(split);
     if(progressUI.view?.bar)split.querySelector('[data-pane="progress"]').append(progressUI.view.bar);
     if(hourlyUI.bar)split.querySelector('[data-pane="hourly"]').append(hourlyUI.bar,hourlyUI.table);
-    const both=progressUI.active&&hourlyUI.active;
+    const both=progressUI.active&&hourlyUI.active,saved=Number(localStorage.getItem('pm-analysis-split'));
     split.hidden=!(progressUI.active||hourlyUI.active);
-    split.querySelector('[data-pane="progress"]').hidden=!progressUI.active;
-    split.querySelector('[data-pane="hourly"]').hidden=!hourlyUI.active;
-    split.querySelector('.analysis-split-bar').hidden=!both;
+    const progressPane=split.querySelector('[data-pane="progress"]'),hourlyPane=split.querySelector('[data-pane="hourly"]');
+    progressPane.hidden=!progressUI.active;hourlyPane.hidden=!hourlyUI.active;
+    split.querySelector('.analysis-split-bar').hidden=!(progressUI.active||hourlyUI.active);
+    const sized=progressUI.active?progressPane:hourlyPane;
+    if(saved)sized.style.flex='0 0 '+saved+'px';
+    if(!both&&progressUI.active)hourlyPane.style.flex='';
+    if(!both&&hourlyUI.active)progressPane.style.flex='';
   }
   renderSavedChange();
   mapAssistantUI.update();
