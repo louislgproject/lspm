@@ -67,11 +67,12 @@ function workspaceFromParts(parts){
 async function withPostgresStore(client,userId,operation,options={}) {
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(userId||''))throw Error('Authentication required.');
   const readOnly=options.readOnly===true;
-  await client.query(readOnly?'BEGIN READ ONLY':'BEGIN');
+  await client.query('BEGIN');
   try {
     await client.query('SET LOCAL ROLE authenticated');
     await client.query("SELECT set_config('request.jwt.claim.sub',$1,true), set_config('search_path','pm,public',true)",[userId]);
-    if(!readOnly)await client.query("INSERT INTO pm.meta(key,value) VALUES ('revision','0'),('schema_version','4') ON CONFLICT(owner_id,key) DO NOTHING");
+    await client.query("INSERT INTO pm.meta(key,value) VALUES ('revision','0'),('schema_version','4') ON CONFLICT(owner_id,key) DO NOTHING");
+    // Reads must not wait on the write lock. Saves still take it so two edits cannot both succeed.
     await client.query(readOnly?"SELECT value FROM pm.meta WHERE key='revision'":"SELECT value FROM pm.meta WHERE key='revision' FOR UPDATE");
     const generators=createStore(postgresAdapter(client));
     const store=Object.fromEntries(Object.entries(generators).map(([key,method])=>[key,(...args)=>run(method(...args))]));
