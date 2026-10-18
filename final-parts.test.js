@@ -13,6 +13,12 @@ test('final IB/OB RH/LH parts keep distinct identities, routes, WIP and hourly q
  const old={...hourly[0],partId:base.id,actual:99};assert.equal(H.modelSeries([old,...hourly],base.id,'pcs').actual,99);assert.equal(H.modelSeries([old,...hourly],children[0].id,'pcs').actual,10);
 });
 
+test('legacy family siblings expose the finest explicitly labeled variant without inventing links',()=>{
+ const {p,base}=fixture(),rh=M.addEntity(p,{type:'Part',name:'LQ2 STD IB RH',inOut:'IB',side:'RH'}),lh=M.addEntity(p,{type:'Part',name:'LQ2 STD IB LH',inOut:'IB',side:'LH'}),other=M.addEntity(p,{type:'Part',name:'LQ2 OPT IB RH',inOut:'IB',side:'RH'}),links=p.relations.length;
+ assert.equal(F.isFinal(p,base),false);assert.deepEqual(new Set(F.expand(p,[base.id])),new Set([rh.id,lh.id]));assert.ok(!F.expand(p,[base.id]).includes(other.id));assert.equal(p.relations.length,links);
+ assert.throws(()=>H.parseInput(p,{partId:base.id,date:'2026-10-17',text:'9am 100 1'}),/최종 파츠/);
+});
+
 const fs=require('node:fs'),os=require('node:os'),path=require('node:path'),browserPath=process.env.CHROME_PATH||'/usr/bin/chromium';
 test('browser: final-part selectors, independent saved counts and simple part registration',{skip:!fs.existsSync(browserPath),timeout:45000},async t=>{
  const {openStore}=require('./local-store'),{createServer}=require('./server'),{chromium}=require('playwright-core'),dir=fs.mkdtempSync(path.join(os.tmpdir(),'final-parts-ui-')),file=path.join(dir,'db.sqlite');
