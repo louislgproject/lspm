@@ -1,11 +1,6 @@
 {
-  "commit": "a9e32b4fccbd6d2a2079849ae00c26e282ce409d",
-  "runId": "39178704998",
-  "conclusion": "failure",
-  "failedSteps": [
-    {
-      "job": "deploy",
-      "step": "Verify published latest UI and restored Library in browser"
-    }
-  ]
+  "commit": "86f7c29cbb35a1fd5aea239c6f54f8cedd4fec16",
+  "runId": "39179623399",
+  "conclusion": "success",
+  "failedSteps": []
 }
