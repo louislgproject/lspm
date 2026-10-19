@@ -65,7 +65,12 @@ BEGIN
  note:=' The same crew also does this line''s sample work. Individual station and subline assignment is not recorded.';
  UPDATE pm.entities e SET data_json=(e.data_json::jsonb || jsonb_build_object('context',trim(coalesce(e.data_json::jsonb->>'context','')||note)))::text
  WHERE e.owner_id=selected_owner AND e.type='Resource' AND e.data_json::jsonb->>'name' IN ('LDM','TEM','SMT')
-  AND coalesce(e.data_json::jsonb->>'context','') NOT LIKE '%also does this line%';
+  AND coalesce(e.data_json::jsonb->>'context','') NOT LIKE '%also does this line%'
+  AND EXISTS (
+   SELECT 1 FROM pm.project_memberships m
+   JOIN pm.projects s ON s.owner_id=m.owner_id AND s.id=m.project_id
+   WHERE m.owner_id=e.owner_id AND m.entity_id=e.id AND s.project_type='sample' AND s.status='active'
+  );
  GET DIAGNOSTICS affected=ROW_COUNT; changed:=changed+affected;
 
  IF changed>0 THEN UPDATE pm.meta SET value=(value::integer+1)::text WHERE owner_id=selected_owner AND key='revision'; END IF;
