@@ -71,6 +71,7 @@ function createCloudHandler({authenticate,withStore,withPublicStore,allowedOrigi
         if(route==='sample-preparation')return respond(200,(await store.samplePreparationList(project)).map(require('./sample-preparation').sanitize));
         return respond(200,await store.listProductionStaffing(project));
       },request.headers.get('x-project-access')||'');}catch(error){
+        if(error.projectAccessRequired)return respond(401,{error:'프로젝트 비밀번호를 입력하거나 다시 접속해 주세요.',code:'PROJECT_ACCESS_REQUIRED',stage:'project-access'});
         const candidate=String(error.code||'PUBLIC_READ_FAILED');
         const code=/^[A-Z0-9_]{1,64}$/.test(candidate)?candidate:'PUBLIC_READ_FAILED';
         return respond(503,{error:'Public workspace is unavailable.',code,stage:error.publicStage==='supabase-data-api'?'supabase-data-api':'public-read'});

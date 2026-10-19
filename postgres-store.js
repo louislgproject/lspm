@@ -76,6 +76,13 @@ async function withPostgresStore(client,userId,operation,options={}) {
     await client.query(readOnly?"SELECT value FROM pm.meta WHERE key='revision'":"SELECT value FROM pm.meta WHERE key='revision' FOR UPDATE");
     const generators=createStore(postgresAdapter(client));
     const store=Object.fromEntries(Object.entries(generators).map(([key,method])=>[key,(...args)=>run(method(...args))]));
+    const nativeHourly=store.listHourly;
+    store.listHourly=async projectId=>{
+      const native=await nativeHourly(projectId);
+      const available=await client.query("SELECT to_regprocedure('public.pm_report_hourly(text)') IS NOT NULL AS enabled");
+      if(!available.rows[0]?.enabled)return native;
+      return (await client.query('SELECT public.pm_report_hourly($1) AS value',[projectId])).rows[0].value;
+    };
     const result=await operation(store,client);
     await client.query('COMMIT');
     return result;
