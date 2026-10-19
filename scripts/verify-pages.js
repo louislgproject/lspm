@@ -29,7 +29,6 @@ async function verifyPages({url='https://louiscxcix.github.io/lspm/',attempts=12
     await page.locator('#projectTitle').filter({hasText:'Global Library'}).waitFor({state:'visible'});
     await page.waitForFunction(()=>document.querySelectorAll('#nodeLayer .node').length>0||document.querySelector('#nodeLayer').children.length>0);
    }else{
-    await page.locator('.project-card a').first().click();
     await page.locator('#projectTitle').waitFor({state:'visible'});
    }
    if(errors.length)throw Error('Published frontend raised '+errors.length+' browser errors.');
